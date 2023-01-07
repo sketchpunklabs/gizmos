@@ -1,0 +1,55 @@
+{
+    "name": "gizmos",
+    "version": "0.0.1",
+    "author": "Pedro Sousa ( Vor @ SketchPunk Labs )",
+    "description": "",
+    "keywords": [
+        "animation",
+        "skeleton",
+        "inverse kinematrics",
+        "armature",
+        "ikrig"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/sketchpunklabs/gizmos#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sketchpunklabs/gizmos.git"
+    },
+    "bugs": {
+        "url": "https://github.com/sketchpunklabs/gizmos/issues"
+    },
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/gizmos.cjs.js",
+    "module": "./dist/gizmos.es.js",
+    "types": "./dist/gizmos.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/gizmos.es.js",
+            "require": "./dist/gizmos.cjs.js"
+        }
+    },
+    "scripts": {
+        "dev": "vite --config vite.config.js",
+        "build": "vite build",
+        "build:types": "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
+        "build:site": "vite build --mode site",
+        "pack": "npm pack",
+        "preview-site": "vite preview",
+        "lint": "eslint . --ext .ts"
+    },
+    "devDependencies": {
+        "@typescript-eslint/eslint-plugin": "^5.48.0",
+        "@typescript-eslint/parser": "^5.48.0",
+        "eslint": "^8.31.0",
+        "three": "^0.148.0",
+        "typescript": "^4.9.3",
+        "vite": "^4.0.0",
+        "vite-plugin-list-directory-contents": "^1.4.5"
+    },
+    "peerDependencies": {
+        "gl-matrix": "^3.4.3"
+    }
+}

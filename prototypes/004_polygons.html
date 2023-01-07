@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+import { vec3 }   from 'gl-matrix';
+
+import iterFlatVec3Buf from './_lib/util/iterFlatVec3Buf.js';
+import iterFlatVec3Line from './_lib/util/iterFlatVec3Line.js';
+
+import Arrows from '../src/geo/Arrows.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 60, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    // const a = Arrows.single();
+    // for( let v of iterFlatVec3Line( a, true ) ){
+    //     Debug.ln.add( v.a, v.b, 0x00ff00 );
+    //     Debug.pnt.add( v.a, 0x00ff00, 2 );
+    // }
+
+    // const b = Arrows.double();
+    // for( let v of iterFlatVec3Line( b, true ) ){
+    //     Debug.ln.add( v.a, v.b, 0x00ff00 );
+    //     Debug.pnt.add( v.a, 0x00ff00, 2 );
+    // }
+
+    const c = Arrows.quad();
+    for( let v of iterFlatVec3Line( c, true ) ){
+        Debug.ln.add( v.a, v.b, 0x00ff00 );
+        Debug.pnt.add( v.a, 0x00ff00, 2 );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+
+
+//#endregion
+</script></body></html>

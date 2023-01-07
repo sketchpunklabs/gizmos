@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+import Ray from '../src/ray/Ray.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+
+window.addEventListener( 'pointerdown', e=>{
+    if( !e.shiftKey ) return;
+
+    const canvas    = App.renderer.domElement;
+    const camera    = App.camera;
+
+    const rect      = canvas.getBoundingClientRect();
+    const x         = e.clientX - rect.x;                  // canvas x position
+    const y         = e.clientY - rect.y;                  // canvas y position
+    const camProj   = camera.projectionMatrix.toArray();   // Need Projection Matrix
+    const camWorld  = camera.matrixWorld.toArray();        // World Space Transform of Camera
+
+    const ray       = new Ray();
+    ray.fromScreenProjection( x, y, rect.width, rect.height, camProj, camWorld );
+
+    Debug.ln.add( ray.posStart, ray.posEnd, 0x00ff00 );
+});
+//#endregion
+</script></body></html>

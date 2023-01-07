@@ -2,18 +2,20 @@ export default class Rect{
     static rounded( w=1, h=1, radius=0.2, seg=4 ){
         const sCnt = seg + 1;
         const out  = new Array( sCnt * 4 * 3 );
-        const wh   = w / 2;
-        const hh   = h / 2;
+        const wh   = w / 2 - radius;
+        const hh   = h / 2 - radius;
         let j      = 0;
         let jj     = sCnt * 3;
         let jjj    = sCnt * 3 * 2;
         let jjjj   = sCnt * 3 * 3;
-        let rad, x, y;
+        let rad : number
+        let x   : number 
+        let y   : number;
         
         for( let i=0; i <= seg; i++ ){
             rad = ( i / seg ) * ( Math.PI / 2 );
-            x   = radius * Math.cos( rad ) + wh - radius;
-            y   = radius * Math.sin( rad ) + hh - radius;
+            x   = radius * Math.cos( rad ) + wh;
+            y   = radius * Math.sin( rad ) + hh;
 
             // Bottom - Right
             out[ j++ ] = x;
@@ -39,3 +41,4 @@ export default class Rect{
         return out;
     }
 }
+

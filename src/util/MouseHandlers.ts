@@ -3,7 +3,7 @@ import type { vec2 } from 'gl-matrix';
 export type MouseHandlersProps = {
     click   ?: ( e:MouseEvent,   pos: vec2 )=>void;
     down    ?: ( e:PointerEvent, pos: vec2 )=>boolean;
-    move    ?: ( e:PointerEvent, pos: vec2, delta: vec2 )=>void;
+    move    ?: ( e:PointerEvent, pos: vec2 )=>void;
     up      ?: ( e:PointerEvent, pos: vec2 )=>void;
 }
 
@@ -18,7 +18,6 @@ export default class MouseHandlers{
     */
     _stopClick  : boolean = false;
     _isActive   : boolean = false;
-    _initialPos : vec2    = [0,0];
     _actions    : MouseHandlersProps | null;
     
     enabled     : boolean = true;
@@ -57,26 +56,25 @@ export default class MouseHandlers{
     };
 
     onPointerMove = ( e: PointerEvent )=>{
-        if( this._actions?.move && this.enabled && this._isActive ){
+        if( this._actions?.move && this.enabled ){
             const pos         = eventLocalPos( e );
-            const delta: vec2 = [
-                this._initialPos[ 0 ] - pos[ 0 ],
-                this._initialPos[ 1 ] - pos[ 1 ],
-            ];
 
-            ( e.target as HTMLElement ).releasePointerCapture( e.pointerId );
-            e.preventDefault();
-            e.stopPropagation();
+            // Only for dragging events, dont do it for Hovering events
+            if( this._isActive ){
+                ( e.target as HTMLElement ).releasePointerCapture( e.pointerId );
+                e.preventDefault();
+                e.stopPropagation();
+            }
 
-            this._actions.move( e, pos, delta );    
+            this._actions.move( e, pos );    
         }
     };
 
     onPointerDown = ( e: PointerEvent )=>{
         if( this._actions?.down && this.enabled ){
-            this._initialPos = eventLocalPos( e );
+            const coord = eventLocalPos( e );
 
-            if( this._actions.down( e, this._initialPos ) ){
+            if( this._actions.down( e, coord ) ){
                 e.preventDefault();
                 e.stopPropagation();
                 this._stopClick = true;

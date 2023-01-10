@@ -35,9 +35,11 @@ window.addEventListener( 'load', async _=>{
     Ref.gizmo.events.on( 'dragStop', ()=>{ App.camCtrl.enabled = true; } );
     // Ref.gizmo.events.on( 'position', (e)=>{ console.log( 'pos_evt', e.detail ) } );
 
-    Ref.gizmo.state.direction = [1,0,-1];
-    Ref.gizmo.state.target    = cube;
-    Ref.gizmo.state.visible   = true;
+    Ref.gizmo.state.planeFwd = [1,1,0];
+    Ref.gizmo.state.planeUp  = [1,0,1];
+    Ref.gizmo.state.target   = cube;
+
+    // Ref.gizmo.state.visible   = true;
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.renderLoop();
@@ -53,137 +55,139 @@ attach()
 -- set anchor = target.pos, compute start + end segment
 -- onDown
 ---- using current position as start
-
-
 */
 
 import { vec3 }             from 'gl-matrix';
 import ShapePointsMesh      from './_lib/meshes/ShapePointsMesh.js';
 import DynLineMesh          from './_lib/meshes/DynLineMesh.js';
+import Vec3Ex from '../src/maths/Vec3Ex.ts';
 
-class SegmentAction{
+class PlaneAction{
     // #region PROPERTIES
-    steps     = 0;
-    incNeg    = true;       // Move segment's starting point in the neg direction
+    steps     = 0.2;
 
-    anchor    = [0,0,0];    // Starting position when dragging
-    value     = [0,0,0];    // current position when dragging
-    
-    range     = 2;          // Distance from origin each point of the segment moves away
     origin    = [0,0,0];
-    direction = [1,0,0];
-    segStart  = [0,0,0];
-    segEnd    = [0,0,0];
-    
-    result    = new NearSegmentResult();
+    forward   = [0,1,0];
+    up        = [0,0,1];
+    right     = [1,0,0];
+
+    anchor    = [0,0,0];
+    value     = [0,0,0];
     // #endregion
 
     // #region DATA
-    _update(){
-        vec3.scaleAndAdd( this.segStart, this.origin, this.direction, this.range );
-        if( this.incNeg )   vec3.scaleAndAdd( this.segEnd, this.origin, this.direction, -this.range );
-        else                vec3.copy( this.segEnd, pos );
-    }
-
     setAnchor( v ){ vec3.copy( this.anchor, v ); return this; }
-    setDirection( v ){ vec3.copy( this.direction, v ); this._update(); return this;  }
+    setForward( v ){ vec3.copy( this.forward, v ); this._update(); return this;  }
+    setUp( v ){ vec3.copy( this.up, v ); this._update(); return this;  }
     setOrigin( v ){ 
         vec3.copy( this.origin, v );
         vec3.copy( this.anchor, v );
-        this._update();
         return this; 
+    }
+
+    _update(){
+        vec3.cross( this.right, this.forward, this.up );
+        vec3.cross( this.up, this.right, this.forward );
+        vec3.normalize( this.right, this.right );
+        vec3.normalize( this.up, this.up );
     }
     // #endregion
 
     // #region METHODS
     isHit( ray ){
-        if( nearSegment( ray, this.segStart, this.segEnd, this.result ) ){
+        const t = intersectPlane( ray, this.origin, this.forward );
+        if( t == null ) return false;
 
-            if( this.steps === 0 ) vec3.copy( this.value, this.result.segPosition );
-            else{
-                const dir   = vec3.sub( [0,0,0], this.result.segPosition, this.anchor );
-                let   dist  = vec3.len( dir );
+        if( this.steps === 0 ) ray.posAt( t, this.value );
+        else{
+            const v = ray.posAt( t, [0,0,0] );
+            vec3.sub( v, v, this.origin );
+            
+            const xDist = Math.round( Vec3Ex.projectScale( v, this.right ) / this.steps ) * this.steps;
+            const yDist = Math.round( Vec3Ex.projectScale( v, this.up ) / this.steps ) * this.steps;
 
-                vec3.normalize( dir, dir );
-                dist = Math.round( dist / this.steps ) * this.steps;
-
-                vec3.scaleAndAdd( this.value, this.anchor, dir, dist );
-            }
-
-            return true;
+            vec3.copy( this.value, this.origin );
+            vec3.scaleAndAdd( this.value, this.value, this.right, xDist );
+            vec3.scaleAndAdd( this.value, this.value, this.up, yDist );
         }
 
-        return false;
+        return true;
     }
 
     getValue(){ return this.value.slice(); }
     // #endregion
 }
 
-class SegmentActionRender extends THREE.Group{
+class PlaneActionRender extends THREE.Group{
     constructor( action ){
         super();
         this._action = action;
-        this._anchor = new ShapePointsMesh();
         this._pnt    = new ShapePointsMesh();
+        this._center = new ShapePointsMesh();
         this._ln     = new DynLineMesh();
 
         this._pnt.add( [0,0,0], 0x00ff00, 3 );
-        this._anchor.add( [0,0,0], 0xffffff, 3 );
+        this._pnt.visible = true;
 
         this.add( this._pnt );
         this.add( this._ln );
-        this.add( this._anchor );
-
-        this._pnt.visible    = false;
-        this._anchor.visible = false;
+        this.add( this._center );
     }
 
-    show(){ this.visible = true; return this; }
-    hide(){
-        this._pnt.visible    = false;
-        this._anchor.visible = false;
-        this.visible         = false;
-        return this; 
-    }
-    
-    // Handle what to do when mouse is pressed
     begin(){
-        this._pnt.position.fromArray( this._action.anchor );
-        this._anchor.position.fromArray( this._action.anchor );
-        this._pnt.visible    = true;
-        //this._anchor.visible = true;
-    }
+        // this._pnt.position.fromArray( this._action.getHit() );
+        // this._pnt.visible = true;
 
-    // Handle what to do when mouse is released
-    end(){
-        this._anchor.position.fromArray( this._action.getValue() );
-        this._pnt.visible = false;
+        // this._center.reset().add( this._action.origin, 0x00ffff, 2 );
+        // this._ln.reset().add( this._action.origin,
+        //     vec3.scaleAndAdd(
+        //         [0,0,0],
+        //         this._action.origin,
+        //         this._action.forward,
+        //         0.5
+        //     ),
+        //     0x00ffff,
+        //     0xffff00,
+        // );
     }
 
     render(){
-        this._pnt.position.fromArray( this._action.getValue() );
-        this._anchor.position.fromArray( this._action.anchor );
-        this._anchor.visible = true;
+        const a = this._action;
+        const v = this._action.getValue();
 
-        this._ln.reset()
-        this._ln.add( this._action.segStart, this._action.segEnd, 0xffff00, 0x00ffff );
+        this._pnt.position.fromArray( v );
+
+        this._center.reset().add( a.origin, 0x00ffff, 2 );
+        this._ln
+            .reset()
+            .add( a.origin, v, 0xffffff )
+            .add( a.origin, vec3.scaleAndAdd( v, a.origin, a.forward, 1.0 ), 0x00ffff, 0xffff00 )
+            .add( a.origin, vec3.scaleAndAdd( v, a.origin, a.up, 0.5 ), 0x00ff00 )
+            .add( a.origin, vec3.scaleAndAdd( v, a.origin, a.right, 0.5 ), 0xff0000 )
+        ;
+    }
+
+    end(){
+        // this._pnt.visible = false;
     }
 }
-
 
 class Gizmo{
     // #region MAIN
     ray             = new Ray();
     events          = new EventDispatcher();
     mouse           = null;
-    action          = new SegmentAction();
-    actionRender    = new SegmentActionRender( this.action );
+
+    action          = new PlaneAction();
+    actionRender    = new PlaneActionRender( this.action );
 
     state           = StateProxy.new({
         position    : [0,0,0],  // Final position
-        direction   : [1,0,0],  // Direction to move away from origin
-        origin      : [0,0,0],  // Starting position of segment
+
+        origin      : [0,0,0],  // Starting position of the plane
+        planeFwd    : [0,1,0],  // Direction the plane faces
+        planeUp     : [0,0,1],  // Up Direction on the plane
+        
         visible     : true,    // Is event
         target      : null,
     });
@@ -232,15 +236,17 @@ class Gizmo{
     // #region EVENTS
     onStateChange = ( e )=>{
         switch( e.detail.prop ){
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            case 'direction' : this.action.setDirection( vec3.normalize( [0,0,0], e.detail.value ) ); break;
+            // // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'planeFwd'  : this.action.setForward( vec3.normalize( [0,0,0], e.detail.value ) ); break;
+            case 'planeUp'   : this.action.setUp( vec3.normalize( [0,0,0], e.detail.value ) ); break;
             case 'origin'    : this.action.setOrigin( e.detail.value ); break;
             case 'visible'   :
                 if( !e.detail.value ) this.actionRender.hide();
                 else                  this.actionRender.show().render();
                 break;
+            
 
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case 'target'    :{
                 if( e.detail.value ){
                     const pos         = e.detail.value.position.toArray();
@@ -291,84 +297,6 @@ class Gizmo{
         }
     }
     // #endregion
-}
-
-
-
-class PlaneAction{
-    anchorPos = [0,0,0];
-    normal    = [0,1,0];
-    hitPos    = [0,0,0];
-
-    setConfig( pos, dir ){
-        vec3.copy( this.anchorPos, pos );
-        vec3.copy( this.normal, dir );
-        return this;
-    }
-
-    isHit( ray ){
-        const t = intersectPlane( ray, this.anchorPos, this.normal );
-        if( t == null ) return false;
-
-        ray.posAt( t, this.hitPos );
-        return true;
-    }
-
-    getHit(){ return this.hitPos.slice(); }
-}
-
-class PlaneActionRender extends THREE.Group{
-    constructor( action ){
-        super();
-        this._action = action;
-        this._pnt    = new ShapePointsMesh();
-        this._center = new ShapePointsMesh();
-        this._ln     = new DynLineMesh();
-
-        this._pnt.add( [0,0,0], 0x00ff00, 3 );
-        this._pnt.visible = false;
-
-        this.add( this._pnt );
-        this.add( this._ln );
-        this.add( this._center );
-    }
-
-    begin(){
-        this._pnt.position.fromArray( this._action.getHit() );
-        this._pnt.visible = true;
-
-        this._center.reset().add( this._action.anchorPos, 0x00ffff, 2 );
-        this._ln.reset().add( this._action.anchorPos,
-            vec3.scaleAndAdd(
-                [0,0,0],
-                this._action.anchorPos,
-                this._action.normal,
-                0.5
-            ),
-            0x00ffff,
-            0xffff00,
-        );
-    }
-
-    render(){
-        this._pnt.position.fromArray( this._action.getHit() );
-
-        this._center.reset().add( this._action.anchorPos, 0x00ffff, 2 );
-        this._ln.reset().add( this._action.anchorPos,
-            vec3.scaleAndAdd(
-                [0,0,0],
-                this._action.anchorPos,
-                this._action.normal,
-                0.5
-            ),
-            0x00ffff,
-            0xffff00,
-        );
-    }
-
-    end(){
-        this._pnt.visible = false;
-    }
 }
 
 //#endregion

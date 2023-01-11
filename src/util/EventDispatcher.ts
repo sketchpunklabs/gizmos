@@ -16,7 +16,7 @@ export default class EventDispatcher{
         return this;
     }
     
-    emit( evtName: string, data: any ){
+    emit( evtName: string, data?: any ){
         this._evt.dispatchEvent( new CustomEvent( evtName, { 
             detail      : data, 
             bubbles     : false, 

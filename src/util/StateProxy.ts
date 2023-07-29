@@ -16,10 +16,7 @@ export default class StateProxy{
     update( struct: ObjectAny, emitChange=false ){
         Object.assign( this.data, struct );
         
-        if( emitChange ){
-            this.emit( 'change', null );
-        }
-
+        if( emitChange ) this.emit( 'change', null );
         return this;
     }
     // #endregion
@@ -28,7 +25,7 @@ export default class StateProxy{
     get( target: any, prop: string, receiver: unknown ){
         // console.log( "GET", "target", target, "prop", prop, "rec", receiver );    
         if( prop === '$' ) return this;
-        return Reflect.get( target, prop, receiver ); //target[ prop ];
+        return Reflect.get( target, prop, receiver ); // target[ prop ];
     }
 
     set( target: any, prop: string, value: any ){

@@ -16,8 +16,8 @@ export default class LineMovementRender extends Group{
         this._pnt.add( [0,0,0], 0x00ff00, 3 );
         this._anchor.add( [0,0,0], 0xffffff, 3 );
 
-        this.add( this._pnt as unknown as Object3D );
-        this.add( this._ln as unknown as Object3D );
+        this.add( this._pnt    as unknown as Object3D );
+        this.add( this._ln     as unknown as Object3D );
         this.add( this._anchor as unknown as Object3D );
 
         this.visible = false;

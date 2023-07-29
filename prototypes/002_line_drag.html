@@ -5,10 +5,7 @@
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
 import facedCube from './_lib/meshes/facedCube.js';
 
-import { Ray, nearSegment, NearSegmentResult, intersectPlane }          from '../src/ray/index.ts';
-import MouseHandlers    from '../src/util/MouseHandlers.ts';
-import EventDispatcher  from '../src/util/EventDispatcher.ts';
-import StateProxy       from '../src/util/StateProxy.ts';
+import Gizmos    from '../src/Gizmos.ts';
 //#endregion
 
 //#region MAIN
@@ -22,353 +19,120 @@ window.addEventListener( 'load', async _=>{
     App.sphericalLook( 0, 20, 6 );
     Debug = await useVisualDebug( App );
 
-
     let cube = facedCube();
     cube.scale.setScalar( 0.2 );
     cube.position.fromArray( [0.0,0.5,0] )
     App.scene.add( cube );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Ref.gizmo = new Gizmo( App.renderer, App.camera, App.scene );
+    Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
 
-    Ref.gizmo.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; } );
-    Ref.gizmo.events.on( 'dragStop', ()=>{ App.camCtrl.enabled = true; } );
-    // Ref.gizmo.events.on( 'position', (e)=>{ console.log( 'pos_evt', e.detail ) } );
+    const giz = new SegmentGizmo();
+    giz.attach( cube );
 
-    Ref.gizmo.state.direction = [1,0,-1];
-    Ref.gizmo.state.target    = cube;
-    Ref.gizmo.state.visible   = true;
+    Ref.gizmos.add( giz );
+    Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+    Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.renderLoop();
 });
 
-/*
-- Every Render require to Compute Distance Scale For renderables
-- Set anchor position & axis direction
 
-attach()
--- set target
--- set direction, compute start+end
--- set anchor = target.pos, compute start + end segment
--- onDown
----- using current position as start
-
-
-*/
-
-import { vec3 }             from 'gl-matrix';
-import ShapePointsMesh      from './_lib/meshes/ShapePointsMesh.js';
 import DynLineMesh          from './_lib/meshes/DynLineMesh.js';
+import { nearSegment, NearSegmentResult } from '../src/ray/nearSegment.ts';
+import Vec3 from '../src/maths/Vec3.ts';
 
-class SegmentAction{
-    // #region PROPERTIES
-    steps     = 0;
-    incNeg    = true;       // Move segment's starting point in the neg direction
+class SegmentGizmo extends THREE.Group{
+    constructor(){
+        super();
+        this._startPos = [-2,0.5,0];
+        this._endPos   = [2,0.5,-1];
 
-    anchor    = [0,0,0];    // Starting position when dragging
-    value     = [0,0,0];    // current position when dragging
-    
-    range     = 2;          // Distance from origin each point of the segment moves away
-    origin    = [0,0,0];
-    direction = [1,0,0];
-    segStart  = [0,0,0];
-    segEnd    = [0,0,0];
-    
-    result    = new NearSegmentResult();
-    // #endregion
+        this.ln        = new DynLineMesh();
 
-    // #region DATA
-    _update(){
-        vec3.scaleAndAdd( this.segStart, this.origin, this.direction, this.range );
-        if( this.incNeg )   vec3.scaleAndAdd( this.segEnd, this.origin, this.direction, -this.range );
-        else                vec3.copy( this.segEnd, pos );
+        this._result   = new NearSegmentResult();
+        this._hitPos   = new Vec3();
+        this._range    = 0.1;
+        this._rangeSq  = this._range ** 2;
+        this._isOver   = false;
+
+        this._attachment = null;
+
+        this.add( this.ln );
+        this._render();
     }
-
-    setAnchor( v ){ vec3.copy( this.anchor, v ); return this; }
-    setDirection( v ){ vec3.copy( this.direction, v ); this._update(); return this;  }
-    setOrigin( v ){ 
-        vec3.copy( this.origin, v );
-        vec3.copy( this.anchor, v );
-        this._update();
-        return this; 
-    }
-    // #endregion
 
     // #region METHODS
-    isHit( ray ){
-        if( nearSegment( ray, this.segStart, this.segEnd, this.result ) ){
-
-            if( this.steps === 0 ) vec3.copy( this.value, this.result.segPosition );
-            else{
-                const dir   = vec3.sub( [0,0,0], this.result.segPosition, this.anchor );
-                let   dist  = vec3.len( dir );
-
-                vec3.normalize( dir, dir );
-                dist = Math.round( dist / this.steps ) * this.steps;
-
-                vec3.scaleAndAdd( this.value, this.anchor, dir, dist );
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    getValue(){ return this.value.slice(); }
+    attach( obj ){ this._attachment = obj; }
     // #endregion
-}
 
-class SegmentActionRender extends THREE.Group{
-    constructor( action ){
-        super();
-        this._action = action;
-        this._anchor = new ShapePointsMesh();
-        this._pnt    = new ShapePointsMesh();
-        this._ln     = new DynLineMesh();
+    // #region GIZMO INTERFACE
 
-        this._pnt.add( [0,0,0], 0x00ff00, 3 );
-        this._anchor.add( [0,0,0], 0xffffff, 3 );
-
-        this.add( this._pnt );
-        this.add( this._ln );
-        this.add( this._anchor );
-
-        this._pnt.visible    = false;
-        this._anchor.visible = false;
-    }
-
-    show(){ this.visible = true; return this; }
-    hide(){
-        this._pnt.visible    = false;
-        this._anchor.visible = false;
-        this.visible         = false;
-        return this; 
-    }
-    
-    // Handle what to do when mouse is pressed
-    begin(){
-        this._pnt.position.fromArray( this._action.anchor );
-        this._anchor.position.fromArray( this._action.anchor );
-        this._pnt.visible    = true;
-        //this._anchor.visible = true;
-    }
-
-    // Handle what to do when mouse is released
-    end(){
-        this._anchor.position.fromArray( this._action.getValue() );
-        this._pnt.visible = false;
-    }
-
-    render(){
-        this._pnt.position.fromArray( this._action.getValue() );
-        this._anchor.position.fromArray( this._action.anchor );
-        this._anchor.visible = true;
-
-        this._ln.reset()
-        this._ln.add( this._action.segStart, this._action.segEnd, 0xffff00, 0x00ffff );
-    }
-}
-
-
-class Gizmo{
-    // #region MAIN
-    ray             = new Ray();
-    events          = new EventDispatcher();
-    mouse           = null;
-    action          = new SegmentAction();
-    actionRender    = new SegmentActionRender( this.action );
-
-    state           = StateProxy.new({
-        position    : [0,0,0],  // Final position
-        direction   : [1,0,0],  // Direction to move away from origin
-        origin      : [0,0,0],  // Starting position of segment
-        visible     : true,    // Is event
-        target      : null,
-    });
-
-    constructor( renderer, camera, scene ){
-        this.canvas = renderer.domElement;
-        this.camera = camera;
-        this.mouse  = new MouseHandlers( this.canvas, { down: this.onDown, move: this.onMove, up: this.onUp } );
+    // Handle Over event, change visual look when mouse is over gizmo
+    onHover( ray ){ // onHover( ray: Ray ) : boolean;
+        const hit = this._isHit( ray );
         
-        const proxy = this.state.$;
-        proxy.on( 'change', this.onStateChange );
-
-        // proxy.on( 'positionChange', (e)=>{ 
-        //     this.render();
-        //     if( this.target ) this.target.position.fromArray( e.detail.value );
-        // } );
-
-        scene.add( this.actionRender );
-    }
-    // #endregion
-
-    // #region ACTION
-    endAction(){ this.actionRender.end(); }
-    beginAction(){
-        if( !this.state.visible ) return;
-
-        this.action.setAnchor( this.state.position );
-        this.actionRender.begin();
-    }
-
-    render(){ 
-        if( !this.state.visible ) return;
-        this.actionRender.render();
-    }
-    // #endregion
-
-    // #region PRIVATE METHODS
-    _updateRay( pos ){
-        const rect      = this.canvas.getBoundingClientRect();
-        const camProj   = this.camera.projectionMatrix.toArray();   // Need Projection Matrix
-        const camWorld  = this.camera.matrixWorld.toArray();        // World Space Transform of Camera
-        this.ray.fromScreenProjection( pos[0], pos[1], rect.width, rect.height, camProj, camWorld );
-    }
-    // #endregion
-
-    // #region EVENTS
-    onStateChange = ( e )=>{
-        switch( e.detail.prop ){
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            case 'direction' : this.action.setDirection( vec3.normalize( [0,0,0], e.detail.value ) ); break;
-            case 'origin'    : this.action.setOrigin( e.detail.value ); break;
-            case 'visible'   :
-                if( !e.detail.value ) this.actionRender.hide();
-                else                  this.actionRender.show().render();
-                break;
-
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            case 'target'    :{
-                if( e.detail.value ){
-                    const pos         = e.detail.value.position.toArray();
-                    this.state.origin = pos;                        // Want to emit change
-                    this.state.$.update( { position:pos }, false ); // Dont Emit Change
-                    this.render();
-                }
-                break;
-            }
-
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            case 'position'  :
-                this.render();
-                if( this.state.target ) this.state.target.position.fromArray( e.detail.value );
-                this.events.emit( 'position', e.detail.value.slice() );
-                break;
+        if( this._isOver !== hit ){
+            this._isOver = hit;
+            this._render();
         }
-    };
 
-    onDown = ( e, pos )=>{
-        if( !this.state.visible ) return false;
+        return hit;
+    }
 
-        if( e.shiftKey ){
-            this._updateRay( pos );
-            // Debug.ln.add( this.ray.posStart, this.ray.posEnd, 0x00ff00 );
+    // Which action to perform on mouse down?
+    onDown( ray ){ 
+        // return ( this._isHit( ray ) )? 'line' : null; 
 
-            if( this.action.isHit( this.ray ) ){                
-                this.beginAction();
-                this.events.emit( 'dragStart' );
-                this.state.position = this.action.getValue();
+        const hit = ( this._isHit( ray ) );
+        
+        if( hit ) this.visible = false;
+        
+        return ( hit )? 'line' : null; 
+    } // onDown( ray: Ray ): string | null;
+
+    // Handle action completion
+    onUp(){ // onUp() : void;
+        this._isOver = false;
+        this._render();
+        this.visible = true;
+    }
+    // #endregion
+
+    // #region LINE ACTION INTERFACE
+    // set initial values for action
+    onLineInit( ln ){   // onLineInit( ln: LineMovement ): void;
+        ln.setSegment( this._startPos, this._endPos );
+    }
+
+    // get action results on drag
+    onLinePosition( pos ){ // onLinePosition( pos: vec3 ): void;
+        this._attachment?.position.fromArray( pos );
+    }
+    // #endregion
+
+    // #region SUPPORT
+    _render(){
+        this.ln.reset();
+        this.ln.add( this._startPos, this._endPos, this._isOver? 0x00ffff:0x777777 );
+        this.ln._updateGeometry();
+    }
+
+    _isHit( ray ){        
+        // Debug.pnt.reset()
+
+        if( nearSegment( ray, this._startPos, this._endPos, this._result ) ){
+            if( this._result.distanceSq <= this._rangeSq ){
+                this._hitPos.copy( this._result.segPosition );
+                // Debug.pnt.add( this._hitPos, 0x00ff00, 3 );
                 return true;
             }
         }
+
         return false;
     }
-
-    onUp = ( e, pos )=>{
-        this.action.setAnchor( this.state.position );
-        this.endAction();
-        this.events.emit( 'dragStop' );
-    }
-
-    onMove = ( e, pos )=>{
-        this._updateRay( pos );
-        if( this.action.isHit( this.ray ) ){
-            // console.log( vec3.distance( this.action.getValue(), this.action.anchor ) );
-            this.state.position = this.action.getValue();
-        }
-    }
     // #endregion
-}
-
-
-
-class PlaneAction{
-    anchorPos = [0,0,0];
-    normal    = [0,1,0];
-    hitPos    = [0,0,0];
-
-    setConfig( pos, dir ){
-        vec3.copy( this.anchorPos, pos );
-        vec3.copy( this.normal, dir );
-        return this;
-    }
-
-    isHit( ray ){
-        const t = intersectPlane( ray, this.anchorPos, this.normal );
-        if( t == null ) return false;
-
-        ray.posAt( t, this.hitPos );
-        return true;
-    }
-
-    getHit(){ return this.hitPos.slice(); }
-}
-
-class PlaneActionRender extends THREE.Group{
-    constructor( action ){
-        super();
-        this._action = action;
-        this._pnt    = new ShapePointsMesh();
-        this._center = new ShapePointsMesh();
-        this._ln     = new DynLineMesh();
-
-        this._pnt.add( [0,0,0], 0x00ff00, 3 );
-        this._pnt.visible = false;
-
-        this.add( this._pnt );
-        this.add( this._ln );
-        this.add( this._center );
-    }
-
-    begin(){
-        this._pnt.position.fromArray( this._action.getHit() );
-        this._pnt.visible = true;
-
-        this._center.reset().add( this._action.anchorPos, 0x00ffff, 2 );
-        this._ln.reset().add( this._action.anchorPos,
-            vec3.scaleAndAdd(
-                [0,0,0],
-                this._action.anchorPos,
-                this._action.normal,
-                0.5
-            ),
-            0x00ffff,
-            0xffff00,
-        );
-    }
-
-    render(){
-        this._pnt.position.fromArray( this._action.getHit() );
-
-        this._center.reset().add( this._action.anchorPos, 0x00ffff, 2 );
-        this._ln.reset().add( this._action.anchorPos,
-            vec3.scaleAndAdd(
-                [0,0,0],
-                this._action.anchorPos,
-                this._action.normal,
-                0.5
-            ),
-            0x00ffff,
-            0xffff00,
-        );
-    }
-
-    end(){
-        this._pnt.visible = false;
-    }
 }
 
 //#endregion

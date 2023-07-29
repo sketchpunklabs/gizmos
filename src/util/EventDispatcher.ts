@@ -17,12 +17,10 @@ export default class EventDispatcher{
     }
     
     emit( evtName: string, data?: any ){
-        this._evt.dispatchEvent( new CustomEvent( evtName, { 
-            detail      : data, 
-            bubbles     : false, 
-            cancelable  : true, 
-            composed    : false,
-        } ) );
+        this._evt.dispatchEvent( ( !data )
+            ? new Event( evtName, { bubbles:false, cancelable:true, composed:false } ) 
+            : new CustomEvent( evtName, { detail:data, bubbles:false, cancelable:true, composed:false } )
+        );
         return this;
     }
 }

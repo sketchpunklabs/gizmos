@@ -1,10 +1,8 @@
-import type { vec2 } from 'gl-matrix';
-
 export type MouseHandlersProps = {
-    click   ?: ( e:MouseEvent,   pos: vec2 )=>void;
-    down    ?: ( e:PointerEvent, pos: vec2 )=>boolean;
-    move    ?: ( e:PointerEvent, pos: vec2 )=>void;
-    up      ?: ( e:PointerEvent, pos: vec2 )=>void;
+    click   ?: ( e:MouseEvent,   pos: ConstVec2 )=>void;
+    down    ?: ( e:PointerEvent, pos: ConstVec2 )=>boolean;
+    move    ?: ( e:PointerEvent, pos: ConstVec2 )=>void;
+    up      ?: ( e:PointerEvent, pos: ConstVec2 )=>void;
 }
 
 export default class MouseHandlers{
@@ -44,14 +42,16 @@ export default class MouseHandlers{
         if( this._actions?.click ) this._actions.click( e, eventLocalPos( e ) );
     };
 
-    onPointerUp   = ( e: PointerEvent )=>{
-        if( !this.enabled )     return;
-        if( this._isActive ){
-            ( e.target as HTMLElement ).releasePointerCapture( e.pointerId );
-            
-            this._isActive = false;
+    onPointerDown = ( e: PointerEvent )=>{
+        if( this._actions?.down && this.enabled ){
+            const coord = eventLocalPos( e );
 
-            if( this._actions?.up ) this._actions.up( e, eventLocalPos( e ) );
+            if( this._actions.down( e, coord ) ){
+                e.preventDefault();
+                e.stopPropagation();
+                this._stopClick = true;
+                this._isActive  = true;
+            }
         }
     };
 
@@ -70,16 +70,14 @@ export default class MouseHandlers{
         }
     };
 
-    onPointerDown = ( e: PointerEvent )=>{
-        if( this._actions?.down && this.enabled ){
-            const coord = eventLocalPos( e );
+    onPointerUp   = ( e: PointerEvent )=>{
+        if( !this.enabled )     return;
+        if( this._isActive ){
+            ( e.target as HTMLElement ).releasePointerCapture( e.pointerId );
+            
+            this._isActive = false;
 
-            if( this._actions.down( e, coord ) ){
-                e.preventDefault();
-                e.stopPropagation();
-                this._stopClick = true;
-                this._isActive  = true;
-            }
+            if( this._actions?.up ) this._actions.up( e, eventLocalPos( e ) );
         }
     };
     // #endregion
@@ -87,7 +85,7 @@ export default class MouseHandlers{
 
 
 // #region HELPERS
-function eventLocalPos( e: MouseEvent ): vec2{
+function eventLocalPos( e: MouseEvent ): TVec2{
     const rect = ( e.target as HTMLElement ).getBoundingClientRect() ;
     return [
         e.clientX - rect.x, // element x position

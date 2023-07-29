@@ -20,10 +20,10 @@ window.addEventListener( 'load', async _=>{
     Debug = await useVisualDebug( App );
 
 
-    // let cube = facedCube();
-    // cube.scale.setScalar( 0.2 );
+    let cube = facedCube();
+    cube.scale.setScalar( 0.2 );
     // cube.position.fromArray( [0.0,0.5,0] )
-    // App.scene.add( cube );
+    App.scene.add( cube );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
@@ -33,6 +33,7 @@ window.addEventListener( 'load', async _=>{
     const gTran = new TranslateGizmo();
     gTran.state.rotation = [0.4,0,0,-0.4];
     gTran.state.position = [0,0.4,0];
+    gTran.state.target   = cube;
 
     Ref.gizmos.add( gTran );
     

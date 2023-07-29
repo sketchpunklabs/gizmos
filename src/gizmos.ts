@@ -1,31 +1,30 @@
 // #region IMPORTS
-import type { vec2 }    from 'gl-matrix';
 import type { WebGLRenderer, Camera, Scene, Object3D } from 'three';
-import type { IGizmo }                    from './types';
 
-import Ray              from './ray/Ray';
-import EventDispatcher  from './util/EventDispatcher';
-import MouseHandlers    from './util/MouseHandlers';
+import Ray                  from './ray/Ray';
+import EventDispatcher      from './util/EventDispatcher';
+import MouseHandlers        from './util/MouseHandlers';
 
 import { LineMovement }     from './actions/LineMovement';
 import LineMovementRender   from './actions/LineMovementRender';
 // #endregion
 
+// Gizmos are 3D Objects that must have implemented gizmo interface
 type TGizmo3D = IGizmo & Object3D;
 
 export default class Gizmos{
     // #region MAIN
-    ray         = new Ray();
-    events      = new EventDispatcher();
-    mouse       : MouseHandlers;
-    canvas      : HTMLElement;
-    scene       : Scene ;
-    camera      : Camera;
+    ray         = new Ray();                        // Reusable Ray
+    events      = new EventDispatcher();            // Main Event Dispatcher
+    mouse       : MouseHandlers;                    // Handle mouse events
+    canvas      : HTMLElement;                      // 3D Canvas
+    scene       : Scene;                            // Scene to add gizmos + support
+    camera      : Camera;                           // Scene's camera
 
-    list        : Array< TGizmo3D > = new Array();
+    list        : Array< TGizmo3D > = new Array();  // List of available gizmos
 
-    dragGizmo   : TGizmo3D | null = null;
-    dragAction  : any = null;
+    dragGizmo   : TGizmo3D | null = null;           // Currently active gizmo
+    dragAction  : any = null;                       // Currently used action
 
     actions     : { [key:string]:any } = {
         line  : { handler: new LineMovement(), renderer: new LineMovementRender() },
@@ -51,7 +50,7 @@ export default class Gizmos{
     // #endregion
 
     // #region PRIVATE METHODS
-    _updateRay( pos: vec2 ){
+    _updateRay( pos: ConstVec2 ){
         const rect      = this.canvas.getBoundingClientRect();
         const camProj   = this.camera.projectionMatrix.toArray();   // Need Projection Matrix
         const camWorld  = this.camera.matrixWorld.toArray();        // World Space Transform of Camera
@@ -60,12 +59,14 @@ export default class Gizmos{
     // #endregion
 
     // #region EVENTS
-    onDown = ( _e: PointerEvent, pos: vec2 ):boolean =>{
+    onDown = ( _e: PointerEvent, pos: ConstVec2 ):boolean =>{
         this._updateRay( pos );
         let action : string | null = null;
 
         for( let g of this.list ){
             if( g.visible ){
+
+                // Check if this gizmo is a hit & which action it needs to use
                 action = g.onDown( this.ray );
 
                 if( action ){
@@ -88,30 +89,31 @@ export default class Gizmos{
         return false;
     };
 
-    onUp = ( _e: PointerEvent, _pos: vec2 ):void =>{
+    onUp = ( _e: PointerEvent, _pos: ConstVec2 ):void =>{
         if( this.dragGizmo ){
-            this.dragGizmo.onUp();
-            this.dragGizmo = null;
+            this.dragGizmo.onUp();                  // Complete drag event
+            this.dragGizmo = null;                  // No longer active for action
             
-            this.dragAction.renderer.postRender();
-            this.dragAction = null;
+            this.dragAction.renderer.postRender();  // Cleanup any rendering
+            this.dragAction = null;                 // No action active
             
-            this.events.emit( 'dragStop' );
+            this.events.emit( 'dragStop' );         // Alert parent that dragging is over
         }
     };
 
-    onMove = ( _e: PointerEvent, pos: vec2 ):void =>{
+    onMove = ( _e: PointerEvent, pos: ConstVec2 ):void =>{
         this._updateRay( pos );
 
         if( this.dragGizmo ){
+            // An action is active, give it the ray to handle
             this.dragAction.handler.onMove( this.ray );
             this.dragAction.renderer.render( this.dragAction.handler );
         }else{
+            // No active action, pass ray to any gizmo for onHover visualization
             for( let g of this.list ){
                 if( g.visible ) g.onHover( this.ray );
             }
         }
     };
     // #endregion
-
 }

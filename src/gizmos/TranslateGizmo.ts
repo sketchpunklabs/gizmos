@@ -1,30 +1,29 @@
 // #region IMPORTS
 import type Ray                           from '../ray/Ray';
-import type { IGizmo }                    from '../types';
 import type { Object3D }                  from 'three';
 import type { LineMovement, ILineMovementHandler } from '../actions/LineMovement';
 import { Group }                          from 'three';
-import { vec3 }                           from 'gl-matrix';
 
 import { nearSegment, NearSegmentResult } from '../ray/nearSegment';
 import StateProxy                         from '../util/StateProxy';
 import DynLineMesh                        from '../render/DynLineMesh';
+import Vec3                               from '../maths/Vec3';
 // #endregion
 
 export default class Translation extends Group implements IGizmo, ILineMovementHandler{
     // #region MAIN
-    _ln      = new DynLineMesh();
-    _hitPos  : vec3 = [0,0,0];
-    _xAxis   : vec3 = [1,0,0];
-    _yAxis   : vec3 = [0,1,0];
-    _zAxis   : vec3 = [0,0,1];
-    _axes    : Array< vec3 > = [ this._xAxis, this._yAxis, this._zAxis ];
+    _ln      = new DynLineMesh();   // Render Gizmo
+    _hitPos  = new Vec3();          // Last hit position
+    _xAxis   = new Vec3( [1,0,0] ); // Axes to move on
+    _yAxis   = new Vec3( [0,1,0] );
+    _zAxis   = new Vec3( [0,0,1] );
+    _axes    : Array< Vec3 > = [ this._xAxis, this._yAxis, this._zAxis ];
     _result  = new NearSegmentResult();
 
-    _rangeSq = 0.1 * 0.1;
-    _selAxis = -1;
+    _rangeSq = 0.1 * 0.1;   // Hit Range
+    _selAxis = -1;          // Which axis was selected
     
-    _isDirty = false;
+    _isDirty = false;       // Do a rerender
 
     state    = StateProxy.new({
         position    : [0,0,0],      // Final position
@@ -45,27 +44,27 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
         switch( e.detail.prop ){            
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case 'rotation' :{
-                vec3.transformQuat( this._xAxis, [1,0,0], this.state.rotation );
-                vec3.transformQuat( this._yAxis, [0,1,0], this.state.rotation );
-                vec3.transformQuat( this._zAxis, [0,0,1], this.state.rotation );
+                this._xAxis.fromQuat( this.state.rotation, [1,0,0] );
+                this._yAxis.fromQuat( this.state.rotation, [0,1,0] );
+                this._zAxis.fromQuat( this.state.rotation, [0,0,1] );
                 this.render();
                 break;
             }
 
-            // // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // case 'target'    :{
-            //     if( e.detail.value ){
-            //         const pos         = e.detail.value.position.toArray();
-            //         this.state.origin = pos;                        // Want to emit change
-            //         this.state.$.update( { position:pos }, false ); // Dont Emit Change
-            //         this.render();
-            //     }
-            //     break;
-            // }
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'target'    :{
+                if( e.detail.value ){
+                    const pos = e.detail.value.position.toArray();
+                    this.state.$.update( { position:pos }, false ); // Dont Emit Change
+                    this.position.fromArray( pos );
+                }
+                break;
+            }
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case 'position'  :
                 this.position.fromArray( this.state.position );
+                this.state.target?.position.fromArray( this.state.position );
                 break;
         }
     };
@@ -94,27 +93,32 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
     onLineInit( ln: LineMovement ){
         ln.steps  = 0;
         ln.incNeg = true;
-        ln.setOffset( vec3.sub( [0,0,0], this.state.position, this._hitPos ) );
+
+        const tmp = new Vec3( this.state.position ).sub( this._hitPos );
+        ln.setOffset( tmp );
+
         ln.setDirection( this._axes[ this._selAxis ] );
         ln.setOrigin( this.state.position );
+        ln.recompute();
     }
 
-    onLinePosition( pos: vec3 ){
+    onLinePosition( pos: ConstVec3 ){
         this.state.position = pos;
     }
     // #endregion
 
-    // #region FUNCTIONS
+    // #region SUPPORT
     _isHit( ray:Ray ){
-        const origin : vec3 = this.state.position;
-        const v      : vec3 = [0,0,0];
+        const origin : TVec3 = this.state.position;
+        const v      = new Vec3();
         let sel      = -1;
         let min      = Infinity;
-        let axis     : vec3;
+        let axis     : Vec3;
 
         for( let i=0; i < 3; i++ ){
             axis = this._axes[ i ];
-            vec3.scaleAndAdd( v, origin, axis, 1 );
+            // vec3.scaleAndAdd( v, origin, axis, 1 );
+            v.fromScaleThenAdd( 1, axis, origin );
 
             if( nearSegment( ray, origin, v, this._result ) ){
                 if( this._result.distanceSq > this._rangeSq ||
@@ -122,7 +126,7 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
 
                 sel = i;
                 min = this._result.distanceSq;
-                vec3.copy( this._hitPos, this._result.segPosition );
+                this._hitPos.copy( this._result.segPosition );
             }
         }
 

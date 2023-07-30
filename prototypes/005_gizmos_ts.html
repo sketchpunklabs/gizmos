@@ -38,8 +38,13 @@ window.addEventListener( 'load', async _=>{
     Ref.gizmos.add( gTran );
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    App.renderLoop();
+    // App.renderLoop();
+    App.createRenderLoop( onPreRender ).start();
 });
+
+function onPreRender(){
+    Ref.gizmos.updateCameraScale();
+}
 //#endregion
 
 </script></body></html>

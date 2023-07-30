@@ -114,6 +114,13 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    scale( v: number ): this{
+        this[ 0 ] *= v;
+        this[ 1 ] *= v;
+        this[ 2 ] *= v;
+        return this;
+    }
+
     norm(): this{
         let mag = Math.sqrt( this[0]**2 + this[1]**2 + this[2]**2 );
         if( mag != 0 ){

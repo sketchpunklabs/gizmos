@@ -12,20 +12,21 @@ import Vec3                               from '../maths/Vec3';
 
 export default class Translation extends Group implements IGizmo, ILineMovementHandler{
     // #region MAIN
-    _ln      = new DynLineMesh();   // Render Gizmo
-    _hitPos  = new Vec3();          // Last hit position
-    _xAxis   = new Vec3( [1,0,0] ); // Axes to move on
-    _yAxis   = new Vec3( [0,1,0] );
-    _zAxis   = new Vec3( [0,0,1] );
-    _axes    : Array< Vec3 > = [ this._xAxis, this._yAxis, this._zAxis ];
-    _result  = new NearSegmentResult();
+    _ln       = new DynLineMesh();   // Render Gizmo
+    _hitPos   = new Vec3();          // Last hit position
+    _xAxis    = new Vec3( [1,0,0] ); // Axes to move on
+    _yAxis    = new Vec3( [0,1,0] );
+    _zAxis    = new Vec3( [0,0,1] );
+    _axes     : Array< Vec3 > = [ this._xAxis, this._yAxis, this._zAxis ];
+    _result   = new NearSegmentResult();
 
-    _rangeSq = 0.1 * 0.1;   // Hit Range
-    _selAxis = -1;          // Which axis was selected
-    
-    _isDirty = false;       // Do a rerender
+    _camScale = 1;          // Scale gizmo by cam distances
+    _range    = 0.1;        // Hit Range
+    _selAxis  = -1;         // Which axis was selected
+    _isDirty  = false;      // Do a rerender
 
-    state    = StateProxy.new({
+    state     = StateProxy.new({
+        scaleFactor : 6,            // Lock size by camera distance
         position    : [0,0,0],      // Final position
         rotation    : [0,0,0,1],    // Orientation
         target      : null,         // Attached Object
@@ -70,7 +71,22 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
     };
     // #endregion
 
-    // #region MOUSE RAY HANDLERS
+    // #region GIZMO INTERFACE
+    onCameraScale( camPos: ConstVec3 ){
+        // Can view scaleFactor as the distance from the camera you want
+        // to keep the object always at. Factor of 2 will always render as 
+        // if its locked at 2 units away from the camera.
+        const scl = Vec3.dist( camPos, this.state.position ) / this.state.scaleFactor;
+
+        if( scl !== this._camScale ){
+            this._camScale = scl;
+            this._xAxis.norm().scale( scl );
+            this._yAxis.norm().scale( scl );
+            this._zAxis.norm().scale( scl );
+            this.render();
+        }
+    }
+
     onHover( ray: Ray ){
         const hit = this._isHit( ray );
         if( this._isDirty ){
@@ -111,21 +127,21 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
     _isHit( ray:Ray ){
         const origin : TVec3 = this.state.position;
         const v      = new Vec3();
+        const rng    = this._range * this._camScale;
         let sel      = -1;
         let min      = Infinity;
         let axis     : Vec3;
-
+        
         for( let i=0; i < 3; i++ ){
             axis = this._axes[ i ];
-            // vec3.scaleAndAdd( v, origin, axis, 1 );
             v.fromScaleThenAdd( 1, axis, origin );
 
             if( nearSegment( ray, origin, v, this._result ) ){
-                if( this._result.distanceSq > this._rangeSq ||
-                    this._result.distanceSq >= min ) continue;
+                if( this._result.distance > rng ||
+                    this._result.distance >= min ) continue;
 
                 sel = i;
-                min = this._result.distanceSq;
+                min = this._result.distance;
                 this._hitPos.copy( this._result.segPosition );
             }
         }

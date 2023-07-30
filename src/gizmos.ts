@@ -47,6 +47,13 @@ export default class Gizmos{
         this.scene.add( g as Object3D );
         return this;
     }
+
+    updateCameraScale(){
+        const pos = this.camera.position.toArray();
+        for( let g of this.list ){
+            if( g.visible ) g.onCameraScale( pos );
+        }
+    }
     // #endregion
 
     // #region PRIVATE METHODS

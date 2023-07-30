@@ -21,6 +21,7 @@ declare global{
     type ConstMat4      = Readonly< TMat4 >;
 
     interface IGizmo{
+        onCameraScale( camPos: ConstVec3 ): void;
         onHover( ray: Ray ) : boolean;
         onDown( ray: Ray )  : string | null;
         onUp()              : void;

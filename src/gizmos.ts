@@ -27,7 +27,7 @@ export default class Gizmos{
     dragAction  : any = null;                       // Currently used action
 
     actions     : { [key:string]:any } = {
-        line  : { handler: new LineMovement(), renderer: new LineMovementRender() },
+        line  : { handler: new LineMovement( this.events ), renderer: new LineMovementRender() },
         // plane : { handler: null, renderer: null },
     };
 

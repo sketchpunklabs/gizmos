@@ -6,6 +6,7 @@ import DynLineMesh              from '../render/DynLineMesh';
 // #endregion
 
 export default class LineMovementRender extends Group{
+    // #region MAIN
     _anchor = new ShapePointsMesh();
     _pnt    = new ShapePointsMesh();
     _ln     = new DynLineMesh();
@@ -22,7 +23,9 @@ export default class LineMovementRender extends Group{
 
         this.visible = false;
     }
+    // #endregion
     
+    // #region METHODS
     render( action: LineMovement ){ this._pnt.position.fromArray( action.dragPos ); }
     postRender( _action: LineMovement ){ this.visible = false; }
     preRender( action: LineMovement ){
@@ -34,4 +37,5 @@ export default class LineMovementRender extends Group{
 
         this.visible = true;
     }
+    // #endregion
 }

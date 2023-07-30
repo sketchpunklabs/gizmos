@@ -118,8 +118,9 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
         ln.recompute();
     }
 
-    onLinePosition( pos: ConstVec3 ){
+    onLinePosition( pos: ConstVec3, ln: LineMovement ){
         this.state.position = pos;
+        ln.events.emit( 'translate', { position:pos, gizmo:this } );
     }
     // #endregion
 

@@ -29,6 +29,9 @@ window.addEventListener( 'load', async _=>{
     Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
     Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; } );
     Ref.gizmos.events.on( 'dragStop', ()=>{ App.camCtrl.enabled = true; } );
+    Ref.gizmos.events.on( 'translate', e=>{
+        console.log( 'onTranslate', e.detail );
+    });
 
     const gTran = new TranslateGizmo();
     gTran.state.rotation = [0.4,0,0,-0.4];

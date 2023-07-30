@@ -1,17 +1,17 @@
 // #region IMPORT
 import type Ray                             from '../ray/Ray';
+import type EventDispatcher                 from '../util/EventDispatcher';
 import { nearSegment, NearSegmentResult }   from '../ray/nearSegment';
-// import { vec3 }                             from 'gl-matrix';
-import Vec3 from '../maths/Vec3';
+import Vec3                                 from '../maths/Vec3';
 // #endregion
 
 export interface ILineMovementHandler{
     onLineInit( ln: LineMovement ): void;
-    onLinePosition( pos: ConstVec3 ): void;
+    onLinePosition( pos: ConstVec3, ln: LineMovement ): void;
 }
 
 export class LineMovement{
-    // #region PROPERTIES
+    // #region MAIN
     steps     = 0;
     incNeg    = true;          // Move segment's starting point in the neg direction
 
@@ -28,6 +28,12 @@ export class LineMovement{
     result    = new NearSegmentResult();
 
     gizmo     : ILineMovementHandler | null = null; // Active gizmo requestion this action
+
+    events    : EventDispatcher;   // Shared Event target to use for dispatching data
+
+    constructor( et: EventDispatcher ){
+        this.events = et;
+    }
     // #endregion
 
     // #region DATA
@@ -99,7 +105,7 @@ export class LineMovement{
                 this.dragPos.fromScaleThenAdd( dist, dir, this.anchor );
             }
 
-            this.gizmo?.onLinePosition( this.dragPos.slice() as ConstVec3 );
+            this.gizmo?.onLinePosition( this.dragPos.slice() as ConstVec3, this );
 
             return true;
         }

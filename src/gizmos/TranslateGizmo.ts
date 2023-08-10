@@ -10,7 +10,7 @@ import DynLineMesh                        from '../render/DynLineMesh';
 import Vec3                               from '../maths/Vec3';
 // #endregion
 
-export default class Translation extends Group implements IGizmo, ILineMovementHandler{
+export default class TranslateGizmo extends Group implements IGizmo, ILineMovementHandler{
     // #region MAIN
     _ln       = new DynLineMesh();   // Render Gizmo
     _hitPos   = new Vec3();          // Last hit position

@@ -1,23 +1,29 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "moduleResolution": "Node",
-    "lib": ["ESNext", "DOM"],
-    "allowSyntheticDefaultImports"      : true,
-    "allowJs"                           : false,
-    "skipLibCheck"                      : false,
-    "esModuleInterop"                   : false,
-    "strict": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "types": [ "vite/client" ]
-  },
-  "include": [ "./src/index.ts", "./src/global.d.ts" ],
-  "exclude": [ "**/*.test.ts", "node_modules" ]
+    "include"           : [ "./src/index.ts", "./src/global.d.ts" ],
+    "exclude"           : [ "**/*.test.ts", "node_modules" ],
+    "compilerOptions"   : {
+        "target"                        : "ESNext",
+        "useDefineForClassFields"       : true,
+        "module"                        : "ESNext",
+        "moduleResolution"              : "Node",
+        "lib"                           : [ "ESNext", "DOM" ],
+        "allowSyntheticDefaultImports"  : true,
+        "allowJs"                       : false,
+        "skipLibCheck"                  : false,
+        "esModuleInterop"               : false,
+        "strict"                        : true,
+        "resolveJsonModule"             : true,
+        "isolatedModules"               : true,
+        
+        "emitDeclarationOnly"           : false,
+        "composite"                     : true,
+        "removeComments"                : true,  
+
+        "noEmit"                        : false,
+        "noUnusedLocals"                : true,
+        "noUnusedParameters"            : true,
+        "noImplicitReturns"             : true,
+        
+        "types"                         : [ "vite/client" ]
+    }
 }

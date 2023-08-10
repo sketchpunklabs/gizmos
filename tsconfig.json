@@ -1,5 +1,5 @@
 {
-    "include"           : [ "./src/index.ts", "./src/global.d.ts" ],
+    "include"           : [ "./src/index.ts", "./src/global.d.ts", "./src/**/*.ts" ],
     "exclude"           : [ "**/*.test.ts", "node_modules" ],
     "compilerOptions"   : {
         "target"                        : "ESNext",

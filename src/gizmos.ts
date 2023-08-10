@@ -11,6 +11,8 @@ import LineMovementRender   from './actions/LineMovementRender';
 
 import { PlaneMovement }    from './actions/PlaneMovement';
 import AngleMovementRender  from './actions/AngleMovementRender';
+
+import Vec3                 from './maths/Vec3';
 // #endregion
 
 // Gizmos are 3D Objects that must have implemented gizmo interface
@@ -33,7 +35,7 @@ export default class Gizmos{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     actions     : { [key:string]:any } = {
         line  : { handler: new LineMovement( this.events ),  renderer: new LineMovementRender() },
-        plane : { handler: new PlaneMovement( this.events ), renderer: new AngleMovementRender() },
+        angle : { handler: new PlaneMovement( this.events ), renderer: new AngleMovementRender() },
     };
 
     constructor( renderer: WebGLRenderer, camera: Camera, scene: Scene ){
@@ -43,7 +45,7 @@ export default class Gizmos{
         this.mouse  = new MouseHandlers( this.canvas, { down: this.onDown, move: this.onMove, up: this.onUp } );
         
         scene.add( this.actions.line.renderer );
-        scene.add( this.actions.plane.renderer );
+        scene.add( this.actions.angle.renderer );
     }
     // #endregion
 
@@ -74,31 +76,47 @@ export default class Gizmos{
     // #region EVENTS
     onDown = ( _e: PointerEvent, pos: ConstVec2 ):boolean =>{
         this._updateRay( pos );
-        let action : string | null = null;
 
-        for( const g of this.list ){
-            if( g.visible ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Find the closest gizmo
+        let minDist   : number        = Infinity;
+        let minGizmo  : IGizmo | null = null;
+        let minAction : string        = '';
+        let action    : string | null = null;
+        let dist      : number;
+        let g         : any;
 
-                // Check if this gizmo is a hit & which action it needs to use
-                action = g.onDown( this.ray );
+        // Check if this gizmo is a hit & which action it needs to use
+        for( g of this.list ){
+            if( g.visible && ( action = g.onDown( this.ray ) ) ){
 
-                if( action ){
-                    // Save Ref to gizmo + action
-                    this.dragGizmo  = g;
-                    this.dragAction = this.actions[ action ];
-                    
-                    // Setup action + render
-                    this.dragAction.handler.setGizmo( g );
-                    this.dragAction.renderer.preRender( this.dragAction.handler );
-                    
-                    // Shoot Events
-                    this.events.emit( 'dragStart' );
+                dist = Vec3.distSqr( g.state.position, this.ray.posStart );
+                if( dist < minDist ){
+                    minGizmo  = g;
+                    minAction = action;
+                    minDist   = dist;
                 }
 
-                return true;
             }
         }
 
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Begin action of closest gizmo
+        if( minGizmo ){
+            // Save Ref to gizmo + action
+            this.dragGizmo  = g;
+            this.dragAction = this.actions[ minAction ];
+            
+            // Setup action + render
+            this.dragAction.handler.setGizmo( g );
+            this.dragAction.renderer.preRender( this.dragAction.handler );
+            
+            // Shoot Events
+            this.events.emit( 'dragStart' );
+            return true;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         return false;
     };
 

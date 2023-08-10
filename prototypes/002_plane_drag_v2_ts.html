@@ -24,9 +24,14 @@ window.addEventListener( 'load', async _=>{
     Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
     Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
 
+    Ref.gizmos.events.on( 'twist',  e=>{
+        if( !e.detail.isDone ) return;
+        console.log( e.detail );
+    });
+
     Ref.giz = new TwistGizmo();
     Ref.giz.state.rotation = quat.setAxisAngle( [], [1,0,0], -45 * Math.PI / 180 );
-    Ref.giz.state.center   = [0,1,0];
+    Ref.giz.state.position = [0,1,0];
     Ref.giz.state.scale    = 0.5;
     Ref.gizmos.add( Ref.giz );
     

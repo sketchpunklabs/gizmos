@@ -5,6 +5,7 @@ import type { LineMovement, ILineMovementHandler } from '../actions/LineMovement
 import { Group }                          from 'three';
 
 import { nearSegment, NearSegmentResult } from '../ray/nearSegment';
+import { intersectSphere }                from '../ray/intersectSphere';
 import StateProxy                         from '../util/StateProxy';
 import DynLineMesh                        from '../render/DynLineMesh';
 import Vec3                               from '../maths/Vec3';
@@ -126,7 +127,7 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
     // #endregion
 
     // #region SUPPORT
-    _isHit( ray:Ray ){
+    _isHit( ray: Ray ){
         const origin : TVec3 = this.state.position;
         const v      = new Vec3();
         const rng    = this._range * this._camScale;
@@ -134,17 +135,19 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
         let min      = Infinity;
         let axis     : Vec3;
         
-        for( let i=0; i < 3; i++ ){
-            axis = this._axes[ i ];
-            v.fromScaleThenAdd( 1, axis, origin );
+        if( intersectSphere( ray, origin, this._camScale ) ){
+            for( let i=0; i < 3; i++ ){
+                axis = this._axes[ i ];
+                v.fromScaleThenAdd( 1, axis, origin );
 
-            if( nearSegment( ray, origin, v, this._result ) ){
-                if( this._result.distance > rng ||
-                    this._result.distance >= min ) continue;
+                if( nearSegment( ray, origin, v, this._result ) ){
+                    if( this._result.distance > rng ||
+                        this._result.distance >= min ) continue;
 
-                sel = i;
-                min = this._result.distance;
-                this._hitPos.copy( this._result.segPosition );
+                    sel = i;
+                    min = this._result.distance;
+                    this._hitPos.copy( this._result.segPosition );
+                }
             }
         }
 

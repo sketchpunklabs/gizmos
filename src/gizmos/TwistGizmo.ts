@@ -32,7 +32,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
 
     state   = StateProxy.new({
         rotation  : [0,0,0,1],
-        center    : [0,0,0],      // Final position
+        position  : [0,0,0],      // Final position
         scale     : 1,            // How to scale the gizmo & action
     });
     
@@ -64,8 +64,8 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
             }
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            case 'center'  : this.position.fromArray( this.state.center ); break;
-            case 'scale'   : this.scale.setScalar( this.state.scale ); break;
+            case 'position' : this.position.fromArray( this.state.position ); break;
+            case 'scale'    : this.scale.setScalar( this.state.scale ); break;
         }
     };
     // #endregion
@@ -89,7 +89,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
         
         if( hit ) this.visible = false;
         
-        return ( hit )? 'plane' : null; 
+        return ( hit )? 'angle' : null; 
     }
 
     // Handle action completion
@@ -107,7 +107,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
     // set initial values for action
     onPlaneInit( action: PlaneMovement ){   
         action
-            .setOrigin( this.state.center )
+            .setOrigin( this.state.position )
             .setQuatDir( this.state.rotation )
             .setScale( this.state.scale );
     }
@@ -120,7 +120,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
 
         if( isDone ) this.state.rotation = q;
 
-        action.events.emit( 'twist', { rotation:q, gizmo:this, isDone } );
+        action.events.emit( 'twist', { rotation:q, yaxis:action.yAxis.slice(), gizmo:this, isDone } );
     }
     // #endregion
 
@@ -133,7 +133,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
     }
 
     _isHit( ray: Ray ){
-        return intersectSphere( ray, this.state.center, 1 );
+        return intersectSphere( ray, this.state.position, this.state.scale );
     }
     // #endregion
 }

@@ -1,0 +1,450 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+// import facedCube from './_lib/meshes/facedCube.js';
+
+import Gizmos           from '../src/Gizmos.ts';
+
+import { Ray, nearSegment, NearSegmentResult, intersectPlane }          from '../src/ray/index.ts';
+import MouseHandlers    from '../src/util/MouseHandlers.ts';
+import EventDispatcher  from '../src/util/EventDispatcher.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+
+    // let cube = facedCube();
+    // cube.scale.setScalar( 0.2 );
+    // cube.position.fromArray( [0.0,0.5,0] )
+    // App.scene.add( cube );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
+    Ref.gizmos.actions.plane = {
+        handler     : new PlaneMovement( Ref.gizmos.events ),
+        // renderer    : new PlaneMovementRender(),
+        renderer    : new AngleMovementRender(),
+    };
+
+    Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+    Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
+
+    App.scene.add( Ref.gizmos.actions.plane.renderer );
+
+
+    Ref.giz = new TwistGizmo();
+    Ref.giz.state.rotation = quat.setAxisAngle( [], [1,0,0], -45 * Math.PI / 180 );
+    Ref.giz.state.center   = [0,1,0];
+    Ref.giz.state.scale    = 0.5;
+    Ref.gizmos.add( Ref.giz );
+
+    // Ref.gizmo = new Gizmo( App.renderer, App.camera, App.scene );
+    // Ref.gizmos.actions.plane = PUT ACTION HERE
+    // Make a function to ADD ACTIONS
+
+    // Ref.gizmo.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; } );
+    // Ref.gizmo.events.on( 'dragStop', ()=>{ App.camCtrl.enabled = true; } );
+    // // Ref.gizmo.events.on( 'position', (e)=>{ console.log( 'pos_evt', e.detail ) } );
+
+    // Ref.gizmo.state.planeFwd = [1,1,0];
+    // Ref.gizmo.state.planeUp  = [1,0,1];
+    // Ref.gizmo.state.target   = cube;
+
+    // Ref.gizmo.state.visible   = true;
+
+    // const action = new PlaneMovement();
+    // const render = new PlaneMovementRender();
+
+    
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+
+import { quat } from 'gl-matrix';
+window.addEventListener( 'keydown', e=>{
+    // console.log( e.key );
+    if( e.key == '`' ){
+        const q = quat.setAxisAngle( [], [1,0,0], -45 * Math.PI / 180 );
+        Ref.giz.state.rotation = q;
+        // Ref.giz.setQuatDir( q );
+    }
+})
+
+import Vec3 from '../src/maths/Vec3.ts';
+import Quat from '../src/maths/Quat.ts';
+
+// export interface IPlaneMovementHandler{
+//     onPlaneInit( ln: PlaneMovement ): void;
+//     onPlaneUpdate( action: PlaneMovement, isDone: boolean ): void;
+// }
+
+class PlaneMovement{
+    events   = null;
+    dragPos  = new Vec3();             // current position when dragging
+    dragDir  = new Vec3();
+    dragAngle = 0;
+
+    steps    = 0;
+    scale    = 1;
+    origin   = new Vec3();
+    xAxis    = new Vec3( 1, 0, 0 );
+    yAxis    = new Vec3( 0, 1, 0 );
+    zAxis    = new Vec3( 0, 0, 1 );   // Will be used as normal
+    rotation = new Quat();            // Rotation that represents the AXES
+
+    gizmo    = null; // : ILineMovementHandler | null = null; // Active gizmo requestion this action
+
+    constructor( et ){
+        this.events = et;
+    }
+
+    // #region METHODS
+    _reset(){
+        this.steps = 0;
+        this.scale = 1;
+    }
+
+    setOrigin( v ){ this.origin.copy( v ); return this; }
+
+    setQuatDir( q ){
+        this.xAxis.fromQuat( q, [1,0,0] );
+        this.yAxis.fromQuat( q, [0,1,0] );
+        this.zAxis.fromQuat( q, [0,0,1] );
+        this.rotation.copy( q );
+        return this;
+    }
+
+    setAxes( x, y, z ){
+        this.xAxis.copy( x );
+        this.yAxis.copy( y );
+        this.zAxis.copy( z );
+        this.rotation.fromAxes( x, y, z );
+        return this;
+    }
+
+    setScale( s ){ this.scale = s; return this; }
+    // #endregion
+
+    // #region IACTION Implementation
+    // Set active gizmo
+    setGizmo( g ){
+        this._reset();
+        this.gizmo = g;
+        this.gizmo.onPlaneInit( this );
+        return this;
+    }
+    // #endregion
+
+    // #region METHODS
+    onUp(){ this.gizmo?.onPlaneUpdate( this, true ); }
+
+    onMove( ray ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const t = intersectPlane( ray, this.origin, this.zAxis );
+        if( t == null ) return false;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Get the intersect position
+        if( this.steps === 0 ) ray.posAt( t, this.dragPos );
+        else{
+            // Step the intersect position
+            ray.posAt( t, this.dragPos );
+
+            this.dragPos.sub( this.origin );
+
+            const xDist = Math.round( Vec3.projectScale( this.dragPos, this.xAxis ) / this.steps ) * this.steps;
+            const yDist = Math.round( Vec3.projectScale( this.dragPos, this.yAxis ) / this.steps ) * this.steps;
+
+            this.dragPos
+                .copy( this.origin )
+                .scaleThenAdd( xDist, this.xAxis )
+                .scaleThenAdd( yDist, this.yAxis );
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.dragDir.fromSub( this.dragPos, this.origin ).norm();
+        this.dragAngle = Vec3.angle( this.yAxis, this.dragDir );
+
+        if( Vec3.dot( this.dragDir, this.xAxis ) > 0 ) this.dragAngle = -this.dragAngle;
+
+        // console.log( this.dragAngle * 180 / Math.PI );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.gizmo?.onPlaneUpdate( this, false );
+        return true;
+    }
+    // #endregion
+}
+
+
+import ShapePointsMesh          from '../src/render/ShapePointsMesh';
+import DynLineMesh              from '../src/render/DynLineMesh';
+
+class PlaneMovementRender extends THREE.Group{
+    _anchor = new ShapePointsMesh();
+    _pnt    = new ShapePointsMesh();
+    _ln     = new DynLineMesh();
+    _circle = new DynLineMesh();
+    _radius = 1;
+    _segments = 12;
+    
+    constructor( radius=1, segs=12 ){
+        super();
+        this.visible = false;
+
+        this.add( this._circle );
+        this.add( this._ln );
+        this.add( this._anchor );
+        this.add( this._pnt);
+                
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this._anchor.add( [0,0,0], 0xaaaaaa, 3 );
+        this._pnt.add( [0,radius,0], 0x00ff00, 3 );
+        this._ln.add( [0,0,0], [0,radius,0], 0xffffff );
+        this._radius = radius;
+
+        this._drawCircle();
+    }
+
+    // #region RENDER INTERFACE
+    render( action ){ 
+        this._pnt.reset();
+        this._ln.reset();
+        this._pnt.add( action.dragPos, 0x00ff00, 3, 1 );
+        this._ln.add( action.origin, action.dragPos, 0x00ff00 );
+        this._ln.add( action.origin, action.yAxis, 0x999999 );
+    }
+
+    postRender( _action ){ 
+        this.visible = false;
+    }
+
+    preRender( action ){
+        this._drawCircle( action.xAxis, action.yAxis );
+        this.visible = true;
+    }
+    // #endregion
+
+    // #region HELPERS
+    _drawCircle( xAxis=[1,0,0], yAxis=[0,1,0] ){
+        const prev = new Vec3();
+        const curr = new Vec3();
+        plane_circle( [0,0,0], [1,0,0], [0,1,0], 0, this._radius, prev );
+
+        this._circle.reset();
+        for( let i=1; i <= this._segments; i++ ){
+            const rad = Math.PI * 2.0 * ( i / this._segments );
+
+            plane_circle( [0,0,0], xAxis, yAxis, rad, this._radius, curr );
+            this._circle.add( prev, curr, 0x999999 );
+
+            prev.copy( curr );
+        }
+
+        this._circle._updateGeometry();
+    }
+    // #endregion
+
+}
+
+function plane_circle( center, xAxis, yAxis, angle, radius, out ){
+    const sin = Math.sin( angle );
+    const cos = Math.cos( angle );
+    out[0] = center[0] + radius * cos * xAxis[0] + radius * sin * yAxis[0];
+    out[1] = center[1] + radius * cos * xAxis[1] + radius * sin * yAxis[1];
+    out[2] = center[2] + radius * cos * xAxis[2] + radius * sin * yAxis[2];
+    return out;
+}
+
+
+import AngleViewMaterial from '../src/render/AngleViewMaterial.ts';
+
+class AngleMovementRender extends THREE.Group{
+    // #region MAIN
+    _pnt = new ShapePointsMesh();
+    _ln  = new DynLineMesh();
+    mesh = null;
+
+    constructor( radius=1, segs=12 ){
+        super();
+        this.visible = false;
+
+        const mat = AngleViewMaterial();
+        const geo = new THREE.PlaneGeometry( 2, 2 );
+        this.mesh = new THREE.Mesh( geo, mat );
+        this.add( this.mesh );
+        this.add( this._ln );
+        this.add( this._pnt );
+    }
+    // #endregion
+
+    // #region RENDER INTERFACE
+    render( action ){ 
+        this._pnt.reset();
+        this._ln.reset();
+        this._pnt.add( action.dragPos, 0xffffff, 5, 2 );
+        this._ln.add( action.origin, action.dragPos, 0xffffff );
+
+        this.mesh.material.radArc = action.dragAngle;
+    }
+
+    postRender( _action ){ 
+        this.visible = false;
+    }
+
+    preRender( action ){
+        this.mesh.position.fromArray( action.origin );
+        this.mesh.quaternion.fromArray( action.rotation );
+        this.mesh.scale.setScalar( action.scale );
+        this.visible = true;
+    }
+    // #endregion
+}
+
+
+import StateProxy           from '../src/util/StateProxy.ts';
+import { intersectSphere }  from '../src/ray/intersectSphere.ts';
+import tearShape            from '../src/geo/Tear.ts';
+
+class TwistGizmo extends THREE.Group{
+    // #region MAIN
+    _shape  = null;
+    _xDir   = new Vec3( [1,0,0] );  // Generate Axes
+    _yDir   = new Vec3( [0,1,0] );
+    _zDir   = new Vec3( [0,0,1] );
+    _isOver = false;
+
+    state   = StateProxy.new({
+        rotation  : [0,0,0,1],
+        center    : [0,0,0],      // Final position
+        scale     : 1,            // How to scale the gizmo & action
+    });
+    
+    constructor(){
+        super();
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const proxy = this.state.$;
+        proxy.on( 'change', this.onStateChange );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const geo   = geoBuffer( tearShape() );
+        geo.computeVertexNormals();
+
+        const mat   = new THREE.MeshBasicMaterial( {side : THREE.DoubleSide, color:0xffffff })
+        this._shape = new THREE.Mesh( geo, mat );
+        this.add( this._shape );
+    }
+
+    onStateChange = ( e )=>{
+        switch( e.detail.prop ){            
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'rotation' :{
+                this._xDir.fromQuat( this.state.rotation, [1,0,0] );
+                this._yDir.fromQuat( this.state.rotation, [0,1,0] );
+                this._zDir.fromQuat( this.state.rotation, [0,0,1] );
+                this._render();
+                break;
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'center'  : this.position.fromArray( this.state.center ); break;
+            case 'scale'   : this.scale.setScalar( this.state.scale ); break;
+        }
+    };
+
+    // #endregion
+
+    // #region GIZMO INTERFACE
+    // Handle Over event, change visual look when mouse is over gizmo
+    onHover( ray ){
+        const hit = this._isHit( ray );
+        
+        if( this._isOver !== hit ){
+            this._isOver = hit;
+            this._render();
+        }
+
+        return hit;
+    }
+
+    // Which action to perform on mouse down?
+    onDown( ray ){ 
+        const hit = ( this._isHit( ray ) );
+        
+        if( hit ) this.visible = false;
+        
+        return ( hit )? 'plane' : null; 
+    }
+
+    // Handle action completion
+    onUp(){
+        this._isOver = false;
+        this._render();
+        this.visible = true;
+    }
+    // #endregion
+
+    // #region PLANE ACTION INTERFACE
+    // set initial values for action
+    onPlaneInit( action ){   
+        action
+            .setOrigin( this.state.center )
+            .setQuatDir( this.state.rotation )
+            .setScale( this.state.scale )
+        ;
+    }
+
+    // get action results on drag
+    onPlaneUpdate( action, isDone ){
+        const q = new Quat()
+            .fromAxisAngle( action.zAxis, action.dragAngle )
+            .mul( action.rotation );
+
+        if( isDone ) this.state.rotation = q;
+
+        action.events.emit( 'twist', { rotation:q, gizmo:this, isDone } );
+    }
+    // #endregion
+
+    // #region SUPPORT
+    _render(){
+        const color = this._isOver? 0xffffff : 0x999999;
+        this._shape.material.color.set( color );
+
+        this.quaternion.fromArray( this.state.rotation );
+    }
+
+    _isHit( ray ){
+        return intersectSphere( ray, this.state.center, 1 );
+    }
+    // #endregion
+}
+
+
+function geoBuffer( props ){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( 'position', new THREE.BufferAttribute( props.vertices, 3 ) );
+
+    if( props.indices ) geo.setIndex( new THREE.BufferAttribute( props.indices, 1 ) );
+    if( props.normal )  geo.setAttribute( 'normal', new THREE.BufferAttribute( props.normal, 3 ) );
+    if( props.uv )      geo.setAttribute( 'uv', new THREE.BufferAttribute( props.uv, 2 ) );
+
+    return geo;
+}
+
+// #endregion
+</script></body></html>

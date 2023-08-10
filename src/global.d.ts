@@ -26,4 +26,11 @@ declare global{
         onDown( ray: Ray )  : string | null;
         onUp()              : void;
     }
+
+    interface IAction{
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setGizmo( g: any ): this;
+        onUp(): void;
+        onMove( ray: Ray ): boolean;
+    }
 }

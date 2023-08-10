@@ -1,7 +1,6 @@
-import packageJson      from "./package.json";
-import path             from "path";
-import { defineConfig } from "vite";
-//import { directoryPlugin } from 'vite-plugin-list-directory-contents/dist/plugin.js';
+import packageJson         from './package.json';
+import path                from 'path';
+import { defineConfig }    from 'vite';
 import { directoryPlugin } from 'vite-plugin-list-directory-contents';
 
 const fileName = {
@@ -32,14 +31,14 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
     } else {
       // command === 'build'
       return {
-        base  : "./",
+        base  : './',
         build : {
           minify    : false,
-          target    : "esnext",
+          target    : 'esnext',
           lib       : {
-            entry    : path.resolve(__dirname, "src/gizmos.ts"),
+            entry    : path.resolve( __dirname, 'src/gizmos.ts' ),
             name     : packageJson.name,
-            formats  : ["es", "cjs", "iife"],
+            formats  : [ 'es', 'cjs', 'iife' ],
             fileName : ( format )=>fileName[format],
           },
         },

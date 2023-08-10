@@ -1,4 +1,5 @@
 // #region IMPORTS
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { WebGLRenderer, Camera, Scene, Object3D } from 'three';
 
 import Ray                  from './ray/Ray';
@@ -7,6 +8,9 @@ import MouseHandlers        from './util/MouseHandlers';
 
 import { LineMovement }     from './actions/LineMovement';
 import LineMovementRender   from './actions/LineMovementRender';
+
+import { PlaneMovement }    from './actions/PlaneMovement';
+import AngleMovementRender  from './actions/AngleMovementRender';
 // #endregion
 
 // Gizmos are 3D Objects that must have implemented gizmo interface
@@ -21,14 +25,15 @@ export default class Gizmos{
     scene       : Scene;                            // Scene to add gizmos + support
     camera      : Camera;                           // Scene's camera
 
-    list        : Array< TGizmo3D > = new Array();  // List of available gizmos
+    list        : Array< TGizmo3D > = [];           // List of available gizmos
 
     dragGizmo   : TGizmo3D | null = null;           // Currently active gizmo
     dragAction  : any = null;                       // Currently used action
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     actions     : { [key:string]:any } = {
-        line  : { handler: new LineMovement( this.events ), renderer: new LineMovementRender() },
-        // plane : { handler: null, renderer: null },
+        line  : { handler: new LineMovement( this.events ),  renderer: new LineMovementRender() },
+        plane : { handler: new PlaneMovement( this.events ), renderer: new AngleMovementRender() },
     };
 
     constructor( renderer: WebGLRenderer, camera: Camera, scene: Scene ){
@@ -38,6 +43,7 @@ export default class Gizmos{
         this.mouse  = new MouseHandlers( this.canvas, { down: this.onDown, move: this.onMove, up: this.onUp } );
         
         scene.add( this.actions.line.renderer );
+        scene.add( this.actions.plane.renderer );
     }
     // #endregion
 
@@ -50,7 +56,7 @@ export default class Gizmos{
 
     updateCameraScale(){
         const pos = this.camera.position.toArray();
-        for( let g of this.list ){
+        for( const g of this.list ){
             if( g.visible ) g.onCameraScale( pos );
         }
     }
@@ -70,7 +76,7 @@ export default class Gizmos{
         this._updateRay( pos );
         let action : string | null = null;
 
-        for( let g of this.list ){
+        for( const g of this.list ){
             if( g.visible ){
 
                 // Check if this gizmo is a hit & which action it needs to use
@@ -96,14 +102,15 @@ export default class Gizmos{
         return false;
     };
 
-    onUp = ( _e: PointerEvent, _pos: ConstVec2 ):void =>{
+    onUp = ():void =>{ //_e: PointerEvent, _pos: ConstVec2
         if( this.dragGizmo ){
-            this.dragGizmo.onUp();                  // Complete drag event
-            this.dragGizmo = null;                  // No longer active for action
-            
+            this.dragAction.handler.onUp();         // Tell action dragging is complete
             this.dragAction.renderer.postRender();  // Cleanup any rendering
             this.dragAction = null;                 // No action active
-            
+
+            this.dragGizmo.onUp();                  // Complete drag event
+            this.dragGizmo = null;                  // No longer active for action
+
             this.events.emit( 'dragStop' );         // Alert parent that dragging is over
         }
     };
@@ -117,7 +124,7 @@ export default class Gizmos{
             this.dragAction.renderer.render( this.dragAction.handler );
         }else{
             // No active action, pass ray to any gizmo for onHover visualization
-            for( let g of this.list ){
+            for( const g of this.list ){
                 if( g.visible ) g.onHover( this.ray );
             }
         }

@@ -97,6 +97,16 @@ export default class Vec3 extends Array< number >{
         this[ 2 ] = vz + 2 * z2;
         return this;
     }
+
+    fromCross( a: ConstVec3, b: ConstVec3 ): this{
+        const ax = a[0], ay = a[1], az = a[2],
+              bx = b[0], by = b[1], bz = b[2];
+
+        this[ 0 ] = ay * bz - az * by;
+        this[ 1 ] = az * bx - ax * bz;
+        this[ 2 ] = ax * by - ay * bx;
+        return this;
+    }
     // #endregion
 
     // #region OPERATORS
@@ -131,6 +141,14 @@ export default class Vec3 extends Array< number >{
         }
         return this;
     }
+
+
+    scaleThenAdd( scale: number, a: ConstVec3 ): this{
+        this[0] += a[0] * scale;
+        this[1] += a[1] * scale;
+        this[2] += a[2] * scale;
+        return this;
+    }
     // #endregion
 
     // #region STATIC    
@@ -141,5 +159,37 @@ export default class Vec3 extends Array< number >{
     static distSqr( a: ConstVec3, b: ConstVec3 ): number{ return (a[ 0 ]-b[ 0 ]) ** 2 + (a[ 1 ]-b[ 1 ]) ** 2 + (a[ 2 ]-b[ 2 ]) ** 2; }
 
     static dot( a: ConstVec3, b: ConstVec3 ): number { return a[ 0 ] * b[ 0 ] + a[ 1 ] * b[ 1 ] + a[ 2 ] * b[ 2 ]; }
+
+    // Scale SRC in relation to TARGET
+    static projectScale( from: ConstVec3, to: ConstVec3 ) : number{
+        // Modified project from https://github.com/Unity-Technologies/UnityCsReference/blob/master/Runtime/Export/Math/Vector3.cs#L265
+        // dot( a, b ) / dot( b, b ) * b
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const denom = this.dot( to, to );
+        return ( denom < 0.000001 )? 0 : this.dot( from, to ) / denom;
+    }
+
+    static angle( a: ConstVec3, b: ConstVec3 ): number{
+        //acos(dot(a,b)/(len(a)*len(b))) 
+        //let theta = this.dot( a, b ) / ( Math.sqrt( a.lenSqr * b.lenSqr ) );
+        //return Math.acos( Math.max( -1, Math.min( 1, theta ) ) ); // clamp ( t, -1, 1 )
+
+        // atan2(len(cross(a,b)),dot(a,b))  
+        const d = this.dot( a, b ),
+              c = new Vec3().fromCross( a, b );
+        return Math.atan2( Vec3.len(c), d ); 
+
+        // This also works, but requires more LEN / SQRT Calls
+        // 2 * atan2( ( u * v.len - v * u.len ).len, ( u * v.len + v * u.len ).len );
+
+        //https://math.stackexchange.com/questions/1143354/numerically-stable-method-for-angle-between-3d-vectors/1782769
+        // θ=2 atan2(|| ||v||u−||u||v ||, || ||v||u+||u||v ||)
+
+        //let cosine = this.dot( a, b );
+        //if(cosine > 1.0) return 0;
+        //else if(cosine < -1.0) return Math.PI;
+        //else return Math.acos( cosine / ( Math.sqrt( a.lenSqr * b.lenSqr() ) ) );
+    }
+
     // #endregion
 }

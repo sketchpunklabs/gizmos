@@ -37,17 +37,17 @@ window.addEventListener( 'load', async _=>{
     //     Debug.pnt.add( v.a, 0x00ff00, 2 );
     // }
 
-    // const c = Arrows.quad();
-    // for( let v of iterFlatVec3Line( c, true ) ){
-    //     Debug.ln.add( v.a, v.b, 0x00ff00 );
-    //     Debug.pnt.add( v.a, 0x00ff00, 2 );
-    // }
-
-    const a = Rect.rounded();
-    for( let v of iterFlatVec3Line( a, true ) ){
+    const c = Arrows.quad();
+    for( let v of iterFlatVec3Line( c, true ) ){
         Debug.ln.add( v.a, v.b, 0x00ff00 );
         Debug.pnt.add( v.a, 0x00ff00, 2 );
     }
+
+    // const a = Rect.rounded();
+    // for( let v of iterFlatVec3Line( a, true ) ){
+    //     Debug.ln.add( v.a, v.b, 0x00ff00 );
+    //     Debug.pnt.add( v.a, 0x00ff00, 2 );
+    // }
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.renderLoop();

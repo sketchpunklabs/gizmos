@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+import Vec3 from '../src/maths/Vec3.ts';
+import Quat from '../src/maths/Quat.ts';
+
+import iterFlatVec3Buf from './_lib/util/iterFlatVec3Buf.js';
+import iterFlatVec3Line from './_lib/util/iterFlatVec3Line.js';
+// #endregion
+
+// #region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    tearShape();
+
+
+    /*
+    let steps = 24;
+    let inc   = (Math.PI * 2.0) / steps;
+    let v     = [0,0,0];
+    let circle = []
+    for( let i=0; i < steps; i++ ){
+        const rad = inc * i + Math.PI * 0.5;
+        const radius = ( i <= 8 )? (1-( i/8 )) **8 * 0.3 + 1 : 1;
+        // const radius = 1;
+
+        plane_circle( [0,0,0], [1,0,0], [0,1,0], rad, radius, v );
+        v[2] = 0.1;
+
+        // console.log( rad, v );
+
+        // Debug.pnt.add( v, 0x00ff00, 2, 2 );
+
+        circle.push( ...v );
+    }
+
+    let ring = [ ...circle ];
+
+    for( let v of iterFlatVec3Buf( circle ) ){
+        ring.push( v[0], v[1], -0.1 );
+    }
+
+    // for( let v of iterFlatVec3Buf( ring ) ){
+    //     Debug.pnt.add( v, 0x00ff00, 2 );
+    // }
+
+    let indices = []
+    for( let i=0; i < steps; i++ ){
+        const ii = i + steps;
+        const c  = (i + 1) % steps;
+        const b  = ((i + 1) % steps) + steps;
+        indices.push( i, ii, b, b, c, i );
+    }
+
+    const geo = geoBuffer( { vertices: new Float32Array(ring), indices: new Uint16Array( indices ) } );
+    const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( {side : THREE.DoubleSide,}) );
+
+    App.scene.add( mesh );
+    */
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+// #endregion
+
+function plane_circle( center, xAxis, yAxis, angle, radius, out ){
+    const sin = Math.sin( angle );
+    const cos = Math.cos( angle );
+    out[0] = center[0] + radius * cos * xAxis[0] + radius * sin * yAxis[0];
+    out[1] = center[1] + radius * cos * xAxis[1] + radius * sin * yAxis[1];
+    out[2] = center[2] + radius * cos * xAxis[2] + radius * sin * yAxis[2];
+    return out;
+}
+
+function geoBuffer( props ){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( 'position', new THREE.BufferAttribute( props.vertices, 3 ) );
+
+    if( props.indices ) geo.setIndex( new THREE.BufferAttribute( props.indices, 1 ) );
+    if( props.normal )  geo.setAttribute( 'normal', new THREE.BufferAttribute( props.normal, 3 ) );
+    if( props.uv )      geo.setAttribute( 'uv', new THREE.BufferAttribute( props.uv, 2 ) );
+
+    return geo;
+}
+
+
+function tearShape( radius=1, steps=24, power=8, pull=0.4 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Generate half shape
+    const hStep = steps / 2;
+    const inc   = (Math.PI * 2.0) / steps;
+    const arc   = [];
+    let v       = [0,0,0];
+    let rad;
+    let r;
+    
+    for( let i=0; i <= hStep; i++ ){
+        rad = inc * i + Math.PI * 0.5;
+        r   = ( i <= hStep )
+            ? (1-( i/hStep )) ** power * pull + radius 
+            : radius;
+
+        plane_circle( [0,0,0], [1,0,0], [0,1,0], rad, r, v );
+        arc.push( v.slice() );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Generate mesh vertices from the half shape
+
+    const verts = [];
+    // Front Face
+    for( let v of arc ){ verts.push( v[0], v[1], 0.1 ); }
+    for( let i=arc.length-2; i > 0; i-- ){ v = arc[ i ]; verts.push( -v[0], v[1], 0.1 ); }
+
+    // Back Face
+    for( let v of arc ){ verts.push( v[0], v[1], -0.1 ); }
+    for( let i=arc.length-2; i > 0; i-- ){ v = arc[ i ]; verts.push( -v[0], v[1], -0.1 ); }
+    
+    // for( let v of iterFlatVec3Buf( verts ) ){
+    //     Debug.pnt.add( v, 0x00ff00, 2 );
+    // }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let indices = []
+    for( let i=0; i < steps; i++ ){
+        const ii = i + steps;
+        const c  = (i + 1) % steps;
+        const b  = ((i + 1) % steps) + steps;
+        indices.push( i, ii, b, b, c, i );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const geo = geoBuffer( { vertices: new Float32Array( verts ), indices: new Uint16Array( indices ) } );
+    geo.computeVertexNormals();
+
+    const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( {side : THREE.DoubleSide,}) );
+    App.scene.add( mesh );
+}
+
+</script></body></html>

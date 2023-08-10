@@ -106,21 +106,22 @@ export default class Translation extends Group implements IGizmo, ILineMovementH
     // #endregion
 
     // #region LINE ACTION HANDLERS
-    onLineInit( ln: LineMovement ){
-        ln.steps  = 0;
-        ln.incNeg = true;
+    onLineInit( action: LineMovement ){
+        action.steps  = 0;
+        action.incNeg = true;
 
         const tmp = new Vec3( this.state.position ).sub( this._hitPos );
-        ln.setOffset( tmp );
+        action.setOffset( tmp );
 
-        ln.setDirection( this._axes[ this._selAxis ] );
-        ln.setOrigin( this.state.position );
-        ln.recompute();
+        action.setDirection( this._axes[ this._selAxis ] );
+        action.setOrigin( this.state.position );
+        action.recompute();
     }
 
-    onLinePosition( pos: ConstVec3, ln: LineMovement ){
+    onLineUpdate( action: LineMovement, isDone: boolean ){
+        const pos = action.dragPos.slice();
         this.state.position = pos;
-        ln.events.emit( 'translate', { position:pos, gizmo:this } );
+        action.events.emit( 'translate', { position:pos, gizmo:this, isDone } );
     }
     // #endregion
 

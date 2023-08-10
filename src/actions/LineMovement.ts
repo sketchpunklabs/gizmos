@@ -6,11 +6,11 @@ import Vec3                                 from '../maths/Vec3';
 // #endregion
 
 export interface ILineMovementHandler{
-    onLineInit( ln: LineMovement ): void;
-    onLinePosition( pos: ConstVec3, ln: LineMovement ): void;
+    onLineInit( action: LineMovement ): void;
+    onLineUpdate( action: LineMovement, isDone: boolean ): void;
 }
 
-export class LineMovement{
+export class LineMovement implements IAction{
     // #region MAIN
     steps     = 0;
     incNeg    = true;          // Move segment's starting point in the neg direction
@@ -29,7 +29,7 @@ export class LineMovement{
 
     gizmo     : ILineMovementHandler | null = null; // Active gizmo requestion this action
 
-    events    : EventDispatcher;   // Shared Event target to use for dispatching data
+    events    : EventDispatcher;   // Shared Event target to use for dispatching data, can be used by Gizmos
 
     constructor( et: EventDispatcher ){
         this.events = et;
@@ -72,17 +72,21 @@ export class LineMovement{
         this.segEnd.copy( end );
         return this;
     }
+    // #endregion
 
+    // #region IACTION Implementation
     // Set active gizmo
     setGizmo( g: ILineMovementHandler ): this{
-        this.gizmo = g;
         this._reset();
+        this.gizmo = g;
         this.gizmo.onLineInit( this );
         return this;
     }
-    // #endregion
 
-    // #region METHODS
+    onUp(): this{
+        this.gizmo?.onLineUpdate( this, true ); return this;
+    }
+
     onMove( ray: Ray ): boolean{
         if( nearSegment( ray, this.segStart, this.segEnd, this.result ) ){
             if( this.steps === 0 ) this.dragPos.fromAdd( this.result.segPosition, this.offset );
@@ -105,7 +109,7 @@ export class LineMovement{
                 this.dragPos.fromScaleThenAdd( dist, dir, this.anchor );
             }
 
-            this.gizmo?.onLinePosition( this.dragPos.slice() as ConstVec3, this );
+            this.gizmo?.onLineUpdate( this, false );
 
             return true;
         }

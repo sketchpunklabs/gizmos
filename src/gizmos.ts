@@ -79,16 +79,16 @@ export default class Gizmos{
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Find the closest gizmo
-        let minDist   : number        = Infinity;
-        let minGizmo  : IGizmo | null = null;
-        let minAction : string        = '';
-        let action    : string | null = null;
+        let minDist   : number          = Infinity;
+        let minGizmo  : TGizmo3D | null = null;
+        let minAction : string          = '';
+        let action    : string | null   = null;
         let dist      : number;
         let g         : any;
 
         // Check if this gizmo is a hit & which action it needs to use
         for( g of this.list ){
-            if( g.visible && ( action = g.onDown( this.ray ) ) ){
+            if( g.visible && ( action = g.onDown( this.ray, this ) ) ){
 
                 dist = Vec3.distSqr( g.state.position, this.ray.posStart );
                 if( dist < minDist ){
@@ -103,16 +103,21 @@ export default class Gizmos{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Begin action of closest gizmo
         if( minGizmo ){
-            // Save Ref to gizmo + action
-            this.dragGizmo  = g;
-            this.dragAction = this.actions[ minAction ];
             
-            // Setup action + render
-            this.dragAction.handler.setGizmo( g );
-            this.dragAction.renderer.preRender( this.dragAction.handler );
-            
-            // Shoot Events
-            this.events.emit( 'dragStart' );
+            // Check if its a non-action gizmo
+            if( minAction !== 'none' ){
+                // Save Ref to gizmo + action
+                this.dragGizmo  = minGizmo;
+                this.dragAction = this.actions[ minAction ];
+                
+                // Setup action + render
+                this.dragAction.handler.setGizmo( minGizmo );
+                this.dragAction.renderer.preRender( this.dragAction.handler );
+                
+                // Shoot dagging events
+                this.events.emit( 'dragStart' );
+            }
+
             return true;
         }
 

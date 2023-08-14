@@ -124,6 +124,20 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    mul( v: ConstVec3 ): this{
+        this[ 0 ] *= v[ 0 ];
+        this[ 1 ] *= v[ 1 ];
+        this[ 2 ] *= v[ 2 ];
+        return this;
+    }
+
+    div( v: ConstVec3 ): this{
+        this[ 0 ] /= v[ 0 ];
+        this[ 1 ] /= v[ 1 ];
+        this[ 2 ] /= v[ 2 ];
+        return this;
+    }
+
     scale( v: number ): this{
         this[ 0 ] *= v;
         this[ 1 ] *= v;
@@ -147,6 +161,20 @@ export default class Vec3 extends Array< number >{
         this[0] += a[0] * scale;
         this[1] += a[1] * scale;
         this[2] += a[2] * scale;
+        return this;
+    }
+
+    min( a: ConstVec3 ): this{
+        this[ 0 ] = Math.min( this[ 0 ], a[ 0 ] );
+        this[ 1 ] = Math.min( this[ 1 ], a[ 1 ] );
+        this[ 2 ] = Math.min( this[ 2 ], a[ 2 ] );
+        return this;
+    }
+
+    max( a: ConstVec3 ): this{
+        this[ 0 ] = Math.max( this[ 0 ], a[ 0 ] );
+        this[ 1 ] = Math.max( this[ 1 ], a[ 1 ] );
+        this[ 2 ] = Math.max( this[ 2 ], a[ 2 ] );
         return this;
     }
     // #endregion

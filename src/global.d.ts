@@ -1,6 +1,7 @@
 export {};
 
-import type  Ray from './ray/Ray';
+import type  Ray    from './ray/Ray';
+import type  Gizmos from './Gizmos';
 
 declare global{
     type TVec2          = [number,number] | Float32Array | Array<number> | number[];
@@ -22,9 +23,9 @@ declare global{
 
     interface IGizmo{
         onCameraScale( camPos: ConstVec3 ): void;
-        onHover( ray: Ray ) : boolean;
-        onDown( ray: Ray )  : string | null;
-        onUp()              : void;
+        onHover( ray: Ray )             : boolean;
+        onDown( ray: Ray, g:Gizmos )    : string | null;
+        onUp()                          : void;
     }
 
     interface IAction{

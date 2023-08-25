@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+
+import { 
+    Gizmos, 
+    PointsGizmo, 
+    TranslateGizmo,
+    TwistGizmo,
+} from '../src/index.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {
+    target : [1.0, 0.5, 0.0],
+
+};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
+    Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+    Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
+    Ref.gizmos.events.on( 'activeGizmo', e=>{
+        // console.log( 'Active Gizmo', e.detail.name );
+
+        if( e.detail.name === 'TwistGizmo' ){
+            Ref.tran.visible = false;
+            Ref.pnt.deselect();
+        }
+    });
+
+    // --------------------------------------
+    Ref.pnt = new PointsGizmo();
+    Ref.pnt.addPoint( Ref.target );
+    Ref.pnt.update();
+
+    Ref.gizmos.add( Ref.pnt );
+    Ref.gizmos.events.on( 'pointSelected',  e=>{
+        // console.log( e.detail );
+        if( e.detail.index !== -1 ){
+            Ref.tran.visible = true;
+            Ref.tran.state.position = e.detail.point.pos.slice();
+        }else{
+            Ref.tran.visible = false;
+        }
+    });
+
+    // --------------------------------------
+    Ref.tran = new TranslateGizmo();
+    Ref.tran.visible = false;
+    Ref.tran.forceScale( 0.5 );
+    Ref.gizmos.add( Ref.tran );
+
+    Ref.gizmos.events.on( 'translate', e=>{
+        if( e.detail.isDone ){
+            const i = Ref.pnt.selectedIndex;
+            if( i !== -1 ){
+                Ref.pnt.setPosition( i, e.detail.position, true );
+                Ref.limb.updateTarget( e.detail.position );
+            }
+        }
+    });
+
+    // --------------------------------------
+    Ref.twist = new TwistGizmo();
+    // Ref.twist.state.rotation = quat.setAxisAngle( [], [1,0,0], -45 * Math.PI / 180 );
+    // Ref.twist.state.position = [0,1,0];
+    Ref.twist.state.scale = 0.20;
+    Ref.gizmos.add( Ref.twist );
+
+    Ref.gizmos.events.on( 'twist',  e=>{
+        if( !e.detail.isDone ) return;
+        console.log( e.detail );
+        Ref.limb.updateTwist( e.detail.yaxis );
+    });
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.limb = new LimbGizmo();
+    Ref.limb.render();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+
+// #endregion
+
+import Vec3 from '../src/maths/Vec3.ts';
+import Quat from '../src/maths/Quat.ts';
+
+class LimbGizmo{
+    basePos     = new Vec3( 0, 1.0, 0.0 );
+    targetPos   = new Vec3( 1.0, 0.5, 0.0 );
+    twist       = 0;
+
+    constructor(){
+
+    }
+
+    updateTarget( pos ){
+        this.targetPos.copy( pos );
+        this.render();
+    }
+    
+    updateTwist( tUp ){
+        const zAxis = new Vec3();
+        zAxis.fromSub( this.targetPos, this.basePos ).norm();
+
+        const xAxis = new Vec3();
+        xAxis.fromCross( [0,1,0], zAxis ).norm();
+
+        const yAxis = new Vec3();
+        yAxis.fromCross( zAxis, xAxis ).norm();
+        
+        
+        this.twist = Vec3.angle( yAxis, tUp );
+        if( Vec3.dot( tUp, xAxis ) > 0 ) this.twist = -this.twist;
+
+
+        // const mid = new Vec3();
+        // mid.fromLerp( this.basePos, this.targetPos, 0.5 );
+
+        // const tmp = mid.clone().add( tUp );
+        // const tmp1 = mid.clone().add( yAxis );
+        
+        // Debug.ln.reset();
+        // Debug.ln.add( mid, tmp, 0x00ff00 );
+        // Debug.ln.add( mid, tmp1, 0x00ffff );
+        // console.log( this.twist );
+    }
+
+    render(){
+        Debug.reset();
+
+        Debug.pnt.add( this.basePos, 0x999999, 2 );
+        Debug.ln.add( this.basePos, this.targetPos, 0x999999 );
+
+        const mid = new Vec3();
+        mid.fromLerp( this.basePos, this.targetPos, 0.5 );
+
+        const dir = new Vec3();
+        dir.fromSub( this.targetPos, this.basePos ).norm();
+
+        const q = new Quat();
+        q.fromLook( dir, [0,1,0] );
+
+        const t = new Quat();
+        t.fromAxisAngle( dir, this.twist );
+        q.pmul( t );
+
+        Ref.twist.state.position = mid;
+        Ref.twist.state.rotation = q;
+    }
+}
+</script></body></html>

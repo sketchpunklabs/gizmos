@@ -39,6 +39,7 @@ export default class Vec3 extends Array< number >{
     // #region GETTERS
     get len(): number{ return Math.sqrt( this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2 ); }
     get lenSqr(): number{ return  this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2; }
+    clone(): Vec3{ return new Vec3( this ); }
     // #endregion
 
     // #region SETTERS
@@ -107,6 +108,14 @@ export default class Vec3 extends Array< number >{
         this[ 2 ] = ax * by - ay * bx;
         return this;
     }
+
+    fromLerp( a: ConstVec3, b: ConstVec3, t: number ): this{
+        const ti  = 1 - t;
+        this[ 0 ] = a[ 0 ] * ti + b[ 0 ] * t;
+        this[ 1 ] = a[ 1 ] * ti + b[ 1 ] * t;
+        this[ 2 ] = a[ 2 ] * ti + b[ 2 ] * t;
+        return this;
+    }
     // #endregion
 
     // #region OPERATORS
@@ -156,6 +165,12 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    negate(): this{
+        this[ 0 ] = -this[ 0 ];
+        this[ 1 ] = -this[ 1 ];
+        this[ 2 ] = -this[ 2 ];
+        return this;
+    }
 
     scaleThenAdd( scale: number, a: ConstVec3 ): this{
         this[0] += a[0] * scale;

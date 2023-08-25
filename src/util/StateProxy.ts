@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type ObjectAny = { [key:string]:any };
 
 export default class StateProxy{

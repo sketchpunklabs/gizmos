@@ -1,0 +1,373 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+import facedCube from './_lib/meshes/facedCube.js';
+
+import { 
+    Gizmos, 
+    // PointsGizmo, 
+    // TranslateGizmo 
+} from '../src/index.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
+    Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+    Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
+
+    // --------------------------------------
+    Ref.giz = new PivotGizmo();
+    Ref.gizmos.add( Ref.giz );
+    
+
+    // App.scene.add( facedCube() )
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+
+// #endregion
+
+import { Ray, intersectAABB, intersectOBB }          from '../src/ray/index.ts';
+// import MouseHandlers    from '../src/util/MouseHandlers.ts';
+// import EventDispatcher  from '../src/util/EventDispatcher.ts';
+import StateProxy       from '../src/util/StateProxy.ts';
+
+import ShapePointsMesh          from '../src/render/ShapePointsMesh';
+
+import Vec3         from '../src/maths/Vec3.ts';
+import Quat         from '../src/maths/Quat.ts';
+import Rect         from '../src/geo/Rect.ts';
+import Cylindrify   from '../src/geo/Cylindrify.ts';
+
+// w=2, h=2, radius=0.2, arcSteps=4, wSteps=6, hSteps=6
+// const pnts = Rect.roundSteps( 2, 1, 0.4, 6, 6, 1 );
+
+//  pnts: Array<TVec3>, axis=2, radius=3, factor=0.5
+//     Cylindrify.apply( pnts, 2, 1, 0.9 );
+//     for( const p of pnts ){
+//         Debug.pnt.add( p, 0xffffff, 2 );
+//     }
+    
+
+function flattenVec3Array( ary ){
+    const len = ary.length * 3;
+    const buf = new Float32Array( len );
+
+    let i=0;
+    for( let p of ary ){
+        buf[i++] = p[0];
+        buf[i++] = p[1];
+        buf[i++] = p[2];
+    }
+
+    return buf;
+}
+
+function pivotRot( pos, rot, pivot, apply ){
+    const q      = new Quat( apply ).mul( rot );    // Apply rotation           
+    const offset = new Vec3()
+        .fromSub( pos, pivot )                      // Get Pivot Offset
+        .transformQuat( apply );                    // Rotate the Pivot Offset
+
+    // Pre-Add Pivot back
+    offset[0] = pivot[0] + offset[0];
+    offset[1] = pivot[1] + offset[1];
+    offset[2] = pivot[2] + offset[2];
+
+    return [ q, offset ];
+}
+
+class PivotGizmo extends THREE.Group{
+    // #region MAIN
+    state   = StateProxy.new({
+        position    : [0,0,0],     // Needed by Gizmos to find closest gizmo hit
+        rotation    : [0,0,0,1],
+        pivotOffset : [0,0.5,0],
+
+        hoverColor  : 0x00ff00,
+        selectColor : 0xffff00,
+        // minDistance : 0.1,
+        color       : 0x999999,
+        // size        : 2,
+        // shape       : 1,
+    });
+
+    _hitPos = [0,0,0];
+
+    _xDir   = new Vec3( [1,0,0] );  // Generate Axes
+    _yDir   = new Vec3( [0,1,0] );
+    _zDir   = new Vec3( [0,0,1] );
+    _hLen   = new Vec3();
+
+    // _min    = null; // TODO, Remove Min&Max
+    // _max    = null;
+    _isOver = false;
+    _mesh   = null;
+
+    constructor(){
+        super();
+        const proxy = this.state.$;
+        proxy.on( 'change', this.onStateChange );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Add point mesh
+        this.add( ( this._pnt = new ShapePointsMesh( 2 )) );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Generate Main Shape
+        const pnts = Rect.roundSteps( 2, 1, 0.4, 6, 6, 1 );
+        Cylindrify.apply( pnts, 2, 1, 0.9 );
+        pnts.push( pnts[0] );   // Add first to last to complete loop for LINE Mesh
+
+        // ------------------------------------
+        // Turn into Mesh
+        const mat  = new THREE.LineBasicMaterial({ color: this.state.color });
+        const buf  = flattenVec3Array( pnts );
+        const geo  = new THREE.BufferGeometry();
+        geo.setAttribute( 'position', new THREE.Float32BufferAttribute( buf, 3 ) );
+        geo.computeBoundingBox();
+
+        this.add( ( this._mesh = new THREE.Line( geo, mat ) ) );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // this._min = geo.boundingBox.min.toArray();
+        // this._max = geo.boundingBox.max.toArray();
+
+        this._hLen.fromSub(
+            geo.boundingBox.max.toArray(),
+            geo.boundingBox.min.toArray(),
+        ).scale( 0.5 );
+
+        this._render();
+    }
+
+    onStateChange = ( e )=>{ // e: CustomEvent
+        
+        switch( e.detail.prop ){            
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'rotation' :{
+                this.quaternion.fromArray( this.state.rotation );
+                this._xDir.fromQuat( this.state.rotation, [1,0,0] );
+                this._yDir.fromQuat( this.state.rotation, [0,1,0] );
+                this._zDir.fromQuat( this.state.rotation, [0,0,1] );
+                // this.render();
+                break;
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'target'    :{
+                if( e.detail.value ){
+                    const pos = e.detail.value.position.toArray();
+                    this.state.$.update( { position:pos }, false ); // Dont Emit Change
+                    this.position.fromArray( pos );
+                }
+                break;
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'position'  :
+                this.position.fromArray( this.state.position );
+                // this.state.target?.position.fromArray( this.state.position );
+                break;
+        }
+    };
+    // #endregion
+
+    // #region GETTERS/SETTERS
+    // #endregion
+
+    // #region METHODS
+    // addPoint( pos: ConstVec3, props: PointProp = {} ): Point{
+    //     const pnt = new Point( pos
+    //         ,( props.color !== undefined )? props.color : this.state.color
+    //         ,( props.size  !== undefined )? props.size  : this.state.size
+    //         ,( props.shape !== undefined )? props.shape : this.state.shape
+    //     );
+
+    //     if( props.userData ) pnt.userData = props.userData;
+
+    //     this._points.push( pnt );
+    //     return pnt;
+    // }
+
+    // setPosition( idx: number, pos: ConstVec3, autoRender:false ): this{
+    //     const p = this._points[ idx ];
+    //     if( p ){
+    //         p.pos.copy( pos );
+    //         if( autoRender ) this._render();
+    //     }
+    //     return this;
+    // }
+
+    // deselect(){
+    //     if( this._selIdx === -1 ) return;
+    //     this._selIdx  = -1;
+    //     this._pselIdx = -1;
+    //     this._render();
+    //     return this;
+    // }
+
+    // update(): this {
+    //     this._render();
+    //     return this;
+    // }
+    // #endregion
+
+    // #region GIZMO INTERFACE
+    // Handle Over event, change visual look when mouse is over gizmo
+    onHover( ray ){
+        const hit = this._isHit( ray, true );
+
+        if( this._isOver !== hit ){
+            this._isOver = hit;
+            this._render();
+            console.log( 'hover' );
+        }
+
+        return hit;
+    }
+
+    // Which action to perform on mouse down?
+    onDown( ray, g ){ // onDown( ray: Ray, g: Gizmos )
+        // const hit = ( this._isHit( ray, false ) );
+
+        // if( this._pselIdx !== this._selIdx ){
+        //     this._render();
+        //     g.events.emit( 'pointSelected', { 
+        //         index   : this._selIdx,
+        //         point   : ( this._selIdx === -1 )? null : this._points[ this._selIdx ],
+        //     });
+        // }
+        
+        // return ( hit )? 'none' : null;
+
+        const hit = ( this._isHit( ray ) );        
+        return ( hit )? 'angle' : null; 
+
+        // return null;
+    }
+
+    onUp(){}
+    onCameraScale(){}
+    onDragStart(){}
+    onDragEnd(){}
+    // #endregion
+
+    // #region PLANE ACTION INTERFACE
+    // set initial values for action
+    onPlaneInit( action ){   //action: PlaneMovement
+        const pivot = new Vec3().fromQuat( this.state.rotation, this.state.pivotOffset );
+        const y     = new Vec3( pivot ).negate().norm();
+        const x     = new Vec3().fromCross( y, this._zDir ).norm();
+        pivot.add( this.state.position );
+
+        action
+            .setOrigin( pivot )
+            .setAxes( x, y, this._zDir )
+            .setScale( 0.5 );
+            
+    }
+
+    // get action results on drag
+    onPlaneUpdate( action, isDone ){ //action: PlaneMovement, isDone: boolean 
+
+
+        if( isDone ){
+            
+
+            // Apply rotation
+            const q = new Quat().fromAxisAngle( action.zAxis, action.dragAngle );
+            const r = new Quat(q).mul( this.state.rotation );
+            
+
+            const pivot = new Vec3().fromQuat( this.state.rotation, this.state.pivotOffset ).add( this.state.position );
+
+            console.log( pivot );
+
+            // const pivot  = new Vec3().fromAdd( this.state.position, this.state.pivotOffset ); // Todo rotate offset
+            const offset = new Vec3().fromSub( this.state.position, pivot ); 
+            offset.fromQuat( q, offset );
+
+            this.state.position = [
+                pivot[0] + offset[0],
+                pivot[1] + offset[1],
+                pivot[2] + offset[2],
+            ];
+
+            this.state.rotation = r;
+
+            // const q      = new Quat( apply ).mul( rot );           
+            // const offset = new Vec3()
+            //     .fromSub( pos, pivot )                      // Get Pivot Offset
+            //     .transformQuat( apply );                    // Rotate the Pivot Offset
+
+            // // Pre-Add Pivot back
+            // offset[0] = pivot[0] + offset[0];
+            // offset[1] = pivot[1] + offset[1];
+            // offset[2] = pivot[2] + offset[2];
+
+        }
+
+        // action.events.emit( 'twist', { rotation:q, yaxis:action.dragDir.slice(), gizmo:this, isDone } );
+    }
+    // #endregion
+
+    // #region SUPPORT
+    _render(){
+        this._mesh.material.color.set( ( this._isOver )
+            ? this.state.hoverColor 
+            : this.state.color
+        );
+
+        const c = ( this._isOver )
+            ? this.state.hoverColor 
+            : this.state.color;
+
+        this._pnt.reset()
+            .add( [0,0,0], c, 5 )
+            .add( this.state.pivotOffset, c, 5, 6 );
+    }
+
+    _isHit( ray, isHover ){
+        // // First test if there is a chance to hit any point
+        // const hit = intersectAABB( ray, this._min, this._max );
+        // if( hit ){
+        //     ray.directionAt( hit[0], this._hitPos );
+
+        //     // Debug.pnt.reset().add( this._hitPos, 0x00ff00, 3 );
+        //     return true;
+        // }
+
+        const hit = intersectOBB( ray,
+            this.state.position, // TODO: Wrong center but good enough
+            this._xDir,
+            this._yDir,
+            this._zDir,
+            this._hLen,
+        );
+
+        if( hit ){
+            ray.directionAt( hit[0], this._hitPos );
+            // Debug.pnt.reset().add( this._hitPos, 0x00ff00, 3 );
+            return true;
+        }
+
+        return false;
+    }
+    // #endregion
+}
+
+</script></body></html>

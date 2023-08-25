@@ -26,6 +26,8 @@ declare global{
         onHover( ray: Ray )             : boolean;
         onDown( ray: Ray, g:Gizmos )    : string | null;
         onUp()                          : void;
+        onDragStart()                   : void;
+        onDragEnd()                     : void;
     }
 
     interface IAction{

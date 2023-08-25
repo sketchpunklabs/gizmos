@@ -84,11 +84,8 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
     }
 
     // Which action to perform on mouse down?
-    onDown( ray: Ray ){ 
-        const hit = ( this._isHit( ray ) );
-        
-        if( hit ) this.visible = false;
-        
+    onDown( ray: Ray ){
+        const hit = ( this._isHit( ray ) );        
         return ( hit )? 'angle' : null; 
     }
 
@@ -96,8 +93,10 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
     onUp(){
         this._isOver = false;
         this._render();
-        this.visible = true;
     }
+
+    onDragStart(): void{ this.visible = false; }
+    onDragEnd(): void { this.visible = true; }
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     onCameraScale(): void{} // _camPos: ConstVec3
@@ -120,7 +119,7 @@ export default class TwistGizmo extends Group implements IGizmo, IPlaneMovementH
 
         if( isDone ) this.state.rotation = q;
 
-        action.events.emit( 'twist', { rotation:q, yaxis:action.yAxis.slice(), gizmo:this, isDone } );
+        action.events.emit( 'twist', { rotation:q, yaxis:action.dragDir.slice(), gizmo:this, isDone } );
     }
     // #endregion
 

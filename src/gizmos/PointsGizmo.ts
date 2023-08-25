@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // #region IMPORTS
 import type Ray             from '../ray/Ray';
@@ -96,6 +97,14 @@ export default class PointsGizmo extends Group implements IGizmo{
         return this;
     }
 
+    deselect(){
+        if( this._selIdx === -1 ) return;
+        this._selIdx  = -1;
+        this._pselIdx = -1;
+        this._render();
+        return this;
+    }
+
     update(): this {
         this._render();
         return this;
@@ -129,12 +138,10 @@ export default class PointsGizmo extends Group implements IGizmo{
         return ( hit )? 'none' : null;
     }
 
-    // Handle action completion
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    onUp(){}
-
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    onCameraScale(): void{} // _camPos: ConstVec3
+    onUp(): void{}
+    onCameraScale(): void{}
+    onDragStart(): void{}
+    onDragEnd(): void{}
     // #endregion
 
     // #region SUPPORT

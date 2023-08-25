@@ -1,0 +1,232 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+
+// #region MAIN
+
+/*
+IDEAS
+- Each Object Proxy can hold a Weakmap of the prop name to a Proxy-ed sub Array or Object
+*/
+
+window.addEventListener( 'load', async _=>{
+
+    // arrayTest();
+    // f32Test();
+    subobjTest();
+
+});
+// #endregion
+
+
+function arrayTest(){
+    const ary = [1,2,3];
+    const handler = {
+        get: ( obj, prop, receiver )=>{
+            console.log( 'get', obj, prop, receiver );
+            return Reflect.get( obj, prop, receiver ); // target[ prop ];
+        },
+
+        set : ( obj, prop, value, receiver )=>{
+            console.log( 'set', obj, prop, value, receiver );
+            Reflect.set( obj, prop, value, receiver );
+            return true;
+        },
+    }
+
+    const prox = new Proxy( ary, handler );
+    
+    console.log( '---------------------' );
+    console.log( 'get [0] : ', prox[0] );
+
+    console.log( '---------------------' );
+    console.log( 'push : ', prox.push( 3 ) );
+    console.log( prox );
+
+    console.log( '---------------------' );
+    console.log( 'change : ', ( prox[0] = 100 ) );
+    console.log( prox );
+}
+
+function f32Test(){
+    const ary = new Float32Array( [1,2,3] );
+
+    const handler = {
+        get: ( obj, prop, receiver )=>{
+            console.log( 'get', obj, prop, receiver );
+            return Reflect.get( obj, prop, receiver ); // target[ prop ];
+        },
+
+        set : ( obj, prop, value, receiver )=>{
+            console.log( 'set', obj, prop, value, receiver );
+            Reflect.set( obj, prop, value, receiver );
+            return true;
+        },
+    }
+
+    const prox = new Proxy( ary, handler );
+    
+    console.log( '---------------------' );
+    console.log( 'get [0] : ', prox[0] );
+
+
+    console.log( '---------------------' );
+    console.log( 'change : ', ( prox[0] = 100 ) );
+    console.log( prox );
+}
+
+function subobjTest(){
+    const data = {
+        a: 1,
+        b: {
+            c: 0,
+            d: 1,
+        },
+        e: [0,1,2],
+    }
+
+    const handler = {
+        get: ( obj, prop, receiver )=>{
+            console.log( 'get', 'obj:', obj, 'prop:', prop, 'receiver:', receiver );
+
+            let rtn = Reflect.get( obj, prop, receiver );
+            console.log( 'Type', typeof rtn );
+            console.log( 'Instanceof Object',  rtn instanceof Object );
+            console.log( 'Constructor Object', ( rtn?.constructor === Object ) );
+            console.log( 'Object-Like', Object.prototype.toString.call( rtn ) );
+
+            console.log( 'IsArray', Array.isArray( rtn ) );
+            console.log( 'Instanceof Array', rtn instanceof Array );
+            console.log( 'Constructor Object', ( rtn?.constructor === Array ) );
+
+            return rtn; // target[ prop ];
+        },
+
+        set : ( obj, prop, value, receiver )=>{
+            console.log( 'set', obj, prop, value, receiver );
+            Reflect.set( obj, prop, value, receiver );
+            return true;
+        },
+    }
+
+    const prox = new Proxy( data, handler );
+
+    console.log( '---------------------' );
+    console.log( '.a : ', prox.a );
+
+    console.log( '---------------------' );
+    console.log( '.b : ', prox.b );
+
+    console.log( '---------------------' );
+    console.log( '.b.c : ', prox.b.c );
+
+    console.log( '---------------------' );
+    console.log( '.e : ', prox.e );
+}
+
+
+class NestedStateProxy{
+    static new( data={} ){ return new Proxy( data, new NestedStateProxy( data ) ); }
+
+    events = new EventTarget();
+    constructor( data ){
+        switch( Object.prototype.toString.call( data ) ){
+            case '[object Object]':
+                this.get = objectGet;
+                this.set = objectSet;
+                break;
+            case '[object Array]':
+                this.get = arrayGet;    
+                this.set = arraySet;
+                break;
+        }
+    }
+
+    // #region EVENTS
+    on( evtName, fn ){
+        this.events.addEventListener( evtName, fn );
+        return this;
+    }
+
+    off( evtName, fn ){
+        this.events.removeEventListener( evtName, fn );
+        return this;
+    }
+
+    once( evtName, fn ){
+        this.events.addEventListener( evtName, fn, { once:true } ); 
+        return this;
+    }
+    
+    emit( evtName, data ){
+        this.events.dispatchEvent( new CustomEvent( evtName, { detail:data, bubbles: false, cancelable:true, composed:false } ) );
+        return this;
+    }
+    // #endregion
+}
+
+class ObjectProxy{
+    map   = new WeakMap();
+    data  = null;
+    root  = null;
+    path  = null;
+    constructor( data, sp, path="" ){
+        this.data = data;
+        this.root = sp;
+        this.path = path;
+    }
+
+    // #region PROXY TRAPS
+    get( target, prop, receiver ){
+        // console.log( "GET", "target", target, "prop", prop, "rec", receiver );    
+        if( prop === '$' ) return this.root;
+
+
+        // Check if a sub proxy exists currently
+        let rtn = this.map.get( prop );
+        if( !rtn ){
+            rtn = Reflect.get( target, prop, receiver );
+
+            switch( Object.prototype.toString.call( rtn ) ){
+                case '[object Object]':
+                    // rtn = new Proxy( rtn, new ObjectProxy( rtn, this.root, this.path + '.' + prop ) );
+                    this.map.set( prop, rtn ); // TODO CREATE OBJECT PROXY
+                    break;
+                case '[object Array]':
+                    // rtn = new Proxy( rtn, new ArrayProxy( rtn, this.root, this.path + '.' + prop ) );
+                    this.map.set( prop, rtn ); // TODO CREATE ARRAY PROXY
+                    break;
+            }
+        }
+        
+        return rtn; // target[ prop ];
+    }
+
+    set( target, prop, value, receiver ){
+        // console.log( "SET", "target", target, "prop", prop, "value", value, 'prev', Reflect.get( target, prop ) );
+        if( prop === '$' ) return false;
+
+        // Only update the state if the value is different
+        if( Reflect.get( target, prop ) !== value ){
+            Reflect.set( target, prop, value );     // Save data to Object
+            // this.root.emit( prop + 'Change', value );    // Emit event that property changed
+            // this.root.emit( 'change', { prop, value } ); // Emit event that any property changed
+        }
+        return true;
+    }
+    // #endregion
+}
+
+class ArrayProxy{
+    map   = new WeakMap();
+    data  = null;
+    root  = null;
+    path  = null;
+    constructor( data, sp, path="" ){
+        this.data = data;
+        this.root = sp;
+        this.path = path;
+    }
+}
+
+</script></body></html>

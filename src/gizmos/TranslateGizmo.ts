@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
 // #region IMPORTS
 import type Ray                           from '../ray/Ray';
 import type { Object3D }                  from 'three';
@@ -72,6 +73,16 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
     };
     // #endregion
 
+    // #region METHODS
+    forceScale( scl:number ){
+        this._camScale = scl;
+        this._xAxis.norm().scale( scl );
+        this._yAxis.norm().scale( scl );
+        this._zAxis.norm().scale( scl );
+        this.render();
+    }
+    // #endregin
+
     // #region GIZMO INTERFACE
     onCameraScale( camPos: ConstVec3 ){
         // Can view scaleFactor as the distance from the camera you want
@@ -79,13 +90,7 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
         // if its locked at 2 units away from the camera.
         const scl = Vec3.dist( camPos, this.state.position ) / this.state.scaleFactor;
 
-        if( scl !== this._camScale ){
-            this._camScale = scl;
-            this._xAxis.norm().scale( scl );
-            this._yAxis.norm().scale( scl );
-            this._zAxis.norm().scale( scl );
-            this.render();
-        }
+        if( scl !== this._camScale ) this.forceScale( scl );
     }
 
     onHover( ray: Ray ){
@@ -104,6 +109,9 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
         this._isDirty = false;
         this.render();
     }
+
+    onDragStart(): void{}
+    onDragEnd(): void {}
     // #endregion
 
     // #region LINE ACTION HANDLERS

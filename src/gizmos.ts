@@ -29,8 +29,9 @@ export default class Gizmos{
 
     list        : Array< TGizmo3D > = [];           // List of available gizmos
 
-    dragGizmo   : TGizmo3D | null = null;           // Currently active gizmo
+    dragGizmo   : TGizmo3D | null = null;           // Currently draggin gizmo
     dragAction  : any = null;                       // Currently used action
+    activeGizmo : TGizmo3D | null = null;           // Currently active gizmo
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     actions     : { [key:string]:any } = {
@@ -104,13 +105,19 @@ export default class Gizmos{
         // Begin action of closest gizmo
         if( minGizmo ){
             
+            if( this.activeGizmo !== minGizmo ){
+                this.activeGizmo = minGizmo;
+                this.events.emit( 'activeGizmo', { gizmo: minGizmo, name: minGizmo.constructor.name } );
+            }
+
             // Check if its a non-action gizmo
             if( minAction !== 'none' ){
-                // Save Ref to gizmo + action
+                // Save Ref to gizmo
                 this.dragGizmo  = minGizmo;
-                this.dragAction = this.actions[ minAction ];
+                this.dragGizmo.onDragStart();
                 
                 // Setup action + render
+                this.dragAction = this.actions[ minAction ];
                 this.dragAction.handler.setGizmo( minGizmo );
                 this.dragAction.renderer.preRender( this.dragAction.handler );
                 
@@ -131,8 +138,9 @@ export default class Gizmos{
             this.dragAction.renderer.postRender();  // Cleanup any rendering
             this.dragAction = null;                 // No action active
 
-            this.dragGizmo.onUp();                  // Complete drag event
-            this.dragGizmo = null;                  // No longer active for action
+            this.dragGizmo.onDragEnd();             // Complete drag event
+            this.dragGizmo.onUp();
+            this.dragGizmo = null;
 
             this.events.emit( 'dragStop' );         // Alert parent that dragging is over
         }

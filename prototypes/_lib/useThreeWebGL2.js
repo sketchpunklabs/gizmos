@@ -41,7 +41,13 @@ export async function useVisualDebug( tjs ){
         import( './meshes/ShapePointsMesh.js' ),
     ]);
 
-    const o = {};
+    const o = {
+        reset : ()=>{
+            o.ln.reset();
+            o.pnt.reset();
+        },
+    };
+
     tjs.scene.add( ( o.ln  = new ary[ 0 ].default ) );
     tjs.scene.add( ( o.pnt = new ary[ 1 ].default ) );
     return o;

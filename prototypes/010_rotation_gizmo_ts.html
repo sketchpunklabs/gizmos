@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
+import facedCube from './_lib/meshes/facedCube.js';
+
+import { Gizmos, RotationGizmo } from '../src/index.ts';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Ref   = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let cube = facedCube();
+    cube.scale.setScalar( 1.0 );
+    cube.position.fromArray( [0.0,0.5,0] )
+    App.scene.add( cube );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.gizmos = new Gizmos( App.renderer, App.camera, App.scene );
+    Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+    Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
+
+    // Ref.gizmos.events.on( 'rotation',  e=>{ console.log( 'rot', e.detail ); });
+
+    Ref.giz = new RotationGizmo();
+    Ref.giz.setTarget( cube );
+    Ref.gizmos.add( Ref.giz );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+    App.createRenderLoop( onPreRender ).start();
+});
+
+function onPreRender(){
+    Ref.gizmos.updateCameraScale();
+}
+// #endregion
+</script></body></html>

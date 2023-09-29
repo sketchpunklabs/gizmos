@@ -43,6 +43,13 @@ export default class Vec3 extends Array< number >{
     // #endregion
 
     // #region SETTERS
+    xyz( x:number, y:number, z:number ): this{
+        this[ 0 ] = x;
+        this[ 1 ] = y;
+        this[ 2 ] = z;
+        return this;
+    }
+
     copy( a: ConstVec3 ): this{
         this[ 0 ] = a[ 0 ];
         this[ 1 ] = a[ 1 ];
@@ -63,6 +70,13 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] = a[ 0 ] - b[ 0 ];
         this[ 1 ] = a[ 1 ] - b[ 1 ];
         this[ 2 ] = a[ 2 ] - b[ 2 ];
+        return this;
+    }
+
+    fromScale( a: ConstVec3, s:number ): this{
+        this[ 0 ] = a[ 0 ] * s;
+        this[ 1 ] = a[ 1 ] * s;
+        this[ 2 ] = a[ 2 ] * s;
         return this;
     }
 
@@ -114,6 +128,17 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] = a[ 0 ] * ti + b[ 0 ] * t;
         this[ 1 ] = a[ 1 ] * ti + b[ 1 ] * t;
         this[ 2 ] = a[ 2 ] * ti + b[ 2 ] * t;
+        return this;
+    }
+
+    /** Project Postion onto a Plane */
+    fromPlaneProj( v: ConstVec3, planePos: ConstVec3, planeNorm: ConstVec3 ): this{
+        // p = target + norm * -( dot( norm, target ) + planeConst )
+        const planeConst = -Vec3.dot( planePos, planeNorm );
+        const scl        = -( Vec3.dot( planeNorm, v ) + planeConst );
+        this[0] = v[0] + planeNorm[0] * scl;
+        this[1] = v[1] + planeNorm[1] * scl;
+        this[2] = v[2] + planeNorm[2] * scl;
         return this;
     }
     // #endregion

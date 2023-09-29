@@ -46,6 +46,11 @@ export default class AngleMovementRender extends Group{
         this.mesh.position.fromArray( action.origin );
         this.mesh.quaternion.fromArray( action.rotation );
         this.mesh.scale.setScalar( action.scale );
+        
+        this.render( action );
+        this._pnt._updateGeometry();
+        this._ln._updateGeometry();
+
         this.visible = true;
     }
     // #endregion

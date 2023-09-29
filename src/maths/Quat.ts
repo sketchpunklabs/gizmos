@@ -27,6 +27,8 @@ export default class Quat extends Array< number >{
         this[ 3 ] = a[ 3 ];
         return this
     }
+
+    clone(): Quat{ return new Quat( this ); }
     // #endregion
 
     // #region FROM SETTERS

@@ -107,15 +107,19 @@ class PivotGizmo extends THREE.Group{
 
     _hitPos = [0,0,0];
 
-    _xDir   = new Vec3( [1,0,0] );  // Generate Axes
-    _yDir   = new Vec3( [0,1,0] );
-    _zDir   = new Vec3( [0,0,1] );
-    _hLen   = new Vec3();
+    _bCenter = new Vec3();
+    _xDir    = new Vec3( [1,0,0] );  // Generate Axes
+    _yDir    = new Vec3( [0,1,0] );
+    _zDir    = new Vec3( [0,0,1] );
+    _hLen    = new Vec3();
+    _tLen    = new Vec3();
 
     // _min    = null; // TODO, Remove Min&Max
     // _max    = null;
     _isOver = false;
     _mesh   = null;
+
+    _axisLmt = 0.65;
 
     constructor(){
         super();
@@ -146,11 +150,20 @@ class PivotGizmo extends THREE.Group{
         // this._min = geo.boundingBox.min.toArray();
         // this._max = geo.boundingBox.max.toArray();
 
-        this._hLen.fromSub(
+        this._bCenter.fromLerp(
+            geo.boundingBox.max.toArray(),
+            geo.boundingBox.min.toArray(),
+            0.5,
+        );
+
+        this._tLen.fromSub(
             geo.boundingBox.max.toArray(),
             geo.boundingBox.min.toArray(),
         ).scale( 0.5 );
 
+        this._hLen.fromScale( this._tLen, 1.08 );
+
+        // probleM might be the true OBB center is wrong
         this._render();
     }
 
@@ -163,7 +176,7 @@ class PivotGizmo extends THREE.Group{
                 this._xDir.fromQuat( this.state.rotation, [1,0,0] );
                 this._yDir.fromQuat( this.state.rotation, [0,1,0] );
                 this._zDir.fromQuat( this.state.rotation, [0,0,1] );
-                // this.render();
+                // this._render();
                 break;
             }
 
@@ -231,11 +244,11 @@ class PivotGizmo extends THREE.Group{
     onHover( ray ){
         const hit = this._isHit( ray, true );
 
-        if( this._isOver !== hit ){
+        // if( this._isOver !== hit ){
             this._isOver = hit;
             this._render();
-            console.log( 'hover' );
-        }
+            // console.log( 'hover' );
+        // }
 
         return hit;
     }
@@ -269,30 +282,41 @@ class PivotGizmo extends THREE.Group{
     // #region PLANE ACTION INTERFACE
     // set initial values for action
     onPlaneInit( action ){   //action: PlaneMovement
+        // const pivot = new Vec3().fromQuat( this.state.rotation, this.state.pivotOffset );
+        // const y     = new Vec3( this._yDir ).negate();
+        // const z     = new Vec3( ( this._getProjAxis() === 1 )? this._zDir : this._xDir );
+        // const x     = new Vec3().fromCross( y, z ).norm();
+        // pivot.add( this.state.position );
+
         const pivot = new Vec3().fromQuat( this.state.rotation, this.state.pivotOffset );
-        const y     = new Vec3( pivot ).negate().norm();
-        const x     = new Vec3().fromCross( y, this._zDir ).norm();
+        const hit   = new Vec3();
+        const axis  = this._getProjAxis( hit );
+        hit.fromQuat( this.state.rotation, hit );
+
+        const y     = new Vec3( this._yDir ).fromSub( hit,  pivot ).norm();
+        const z     = new Vec3( ( axis === 1 )? this._zDir : this._xDir );
+        const x     = new Vec3().fromCross( y, z ).norm();
+
         pivot.add( this.state.position );
+
+        // console.log( x, y, z );
 
         action
             .setOrigin( pivot )
-            .setAxes( x, y, this._zDir )
+            .setAxes( x, y, z )
             .setScale( 0.5 );
-            
+
+        action.dragPos.copy( hit );
     }
 
     // get action results on drag
     onPlaneUpdate( action, isDone ){ //action: PlaneMovement, isDone: boolean 
-
-
         if( isDone ){
             
-
             // Apply rotation
             const q = new Quat().fromAxisAngle( action.zAxis, action.dragAngle );
-            const r = new Quat(q).mul( this.state.rotation );
+            const r = new Quat(q).mul( this.state.rotation ).norm();
             
-
             const pivot = new Vec3().fromQuat( this.state.rotation, this.state.pivotOffset ).add( this.state.position );
 
             console.log( pivot );
@@ -339,6 +363,40 @@ class PivotGizmo extends THREE.Group{
         this._pnt.reset()
             .add( [0,0,0], c, 5 )
             .add( this.state.pivotOffset, c, 5, 6 );
+
+        if( this._isOver ){
+            // const z = new Vec3()
+            //     .fromPlaneProj( this._hitPos, this.state.position, this._yDir )
+            //     .sub( this.state.position )
+            //     .norm();
+
+            // Debug.ln.reset();
+
+            // this._pnt.add( z, 0x00ffff, 4, 1 );
+
+            // Debug.pnt.add( new Vec3(z).add( this.state.position ), 0x00ffff, 4, 1 );
+
+            // Debug.ln.add( this.state.position, new Vec3( this._xDir ).add( this.state.position ), 0xff0000 );
+            // Debug.ln.add( this.state.position, new Vec3( this._yDir ).add( this.state.position ), 0x00ff00 );
+            // Debug.ln.add( this.state.position, new Vec3( this._zDir ).add( this.state.position ), 0x0000ff );            
+            const p = [0,0,0];
+            this._getProjAxis( p );
+            this._pnt.add( p, 0x00ffff, 5, 6 );
+
+            // if( Math.abs(this._getProjAxis()) === 1 ){
+            //     const p = [ this._tLen[0], this._bCenter[1] + this._tLen[1], 0 ];
+            //     this._pnt.add( p, 0x00ffff, 5, 6 );
+
+            //     p[0] = -p[0];
+            //     this._pnt.add( p, 0x00ffff, 5, 6 );
+            // }else{
+            //     const p = [ 0, 0, this._tLen[2] ];
+            //     this._pnt.add( p, 0x00ffff, 5, 6 );
+
+            //     p[2] = -p[2];
+            //     this._pnt.add( p, 0x00ffff, 5, 6 );
+            // }
+        }
     }
 
     _isHit( ray, isHover ){
@@ -350,9 +408,12 @@ class PivotGizmo extends THREE.Group{
         //     // Debug.pnt.reset().add( this._hitPos, 0x00ff00, 3 );
         //     return true;
         // }
+        const c   = new Vec3()
+            .fromQuat(  this.state.rotation, this._bCenter )
+            .add( this.state.position );
 
         const hit = intersectOBB( ray,
-            this.state.position, // TODO: Wrong center but good enough
+            c,
             this._xDir,
             this._yDir,
             this._zDir,
@@ -360,13 +421,47 @@ class PivotGizmo extends THREE.Group{
         );
 
         if( hit ){
-            ray.directionAt( hit[0], this._hitPos );
-            // Debug.pnt.reset().add( this._hitPos, 0x00ff00, 3 );
+            ray.posAt( hit[0], this._hitPos );
+            // Debug.pnt.reset().add( this._hitPos, 0x00ff00, 2 );
+
+            // const v = new Vec3().fromPlaneProj( this._hitPos, this.state.position, this._yDir );
+            // console.log( v, this.state.position, this._yDir );
+            // Debug.pnt.add( v, 0x00ffff, 2 );
+
             return true;
         }
 
         return false;
     }
+    
+    
+    _getProjAxis( v=null ){
+        const z = new Vec3()
+            .fromPlaneProj( this._hitPos, this.state.position, this._yDir )
+            .sub( this.state.position )
+            .norm();
+
+        const d = Vec3.dot( z, this._zDir );
+        const a = ( Math.abs( d ) >= this._axisLmt )? 2 : 1;
+
+        // Compute Position if requested
+        if( v ){
+            if( a === 1 ){  // X Axis
+                v[0] = this._tLen[0];
+                v[1] = this._bCenter[1] + this._tLen[1];
+                v[2] = 0;
+                if( Vec3.dot( z, this._xDir ) < 0 ) v[0] = -v[0];
+            }else{  // Z Axis
+                v[0] = 0;
+                v[1] = 0;
+                v[2] = this._tLen[2];
+                if( Math.sign( d ) === -1 ) v[2] = -v[2];
+            }
+        }
+
+        return a;
+    }
+    
     // #endregion
 }
 

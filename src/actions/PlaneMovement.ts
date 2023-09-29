@@ -21,7 +21,7 @@ export class PlaneMovement implements IAction{
     scale     = 1;
     origin    = new Vec3();
     xAxis     = new Vec3( 1, 0, 0 );
-    yAxis     = new Vec3( 0, 1, 0 );
+    yAxis     = new Vec3( 0, 1, 0 );   // Will be used at target direction
     zAxis     = new Vec3( 0, 0, 1 );   // Will be used as normal
     rotation  = new Quat();            // Rotation that represents the AXES
 
@@ -35,8 +35,9 @@ export class PlaneMovement implements IAction{
 
     // #region METHODS
     _reset(){
-        this.steps = 0;
-        this.scale = 1;
+        this.steps     = 0;
+        this.scale     = 1;
+        this.dragAngle = 0;
     }
 
     setOrigin( v: ConstVec3 ){ this.origin.copy( v ); return this; }

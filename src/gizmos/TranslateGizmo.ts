@@ -81,6 +81,8 @@ export default class TranslateGizmo extends Group implements IGizmo, ILineMoveme
         this._zAxis.norm().scale( scl );
         this.render();
     }
+
+    setTarget( o: Object3D ): this{ this.state.target = o; return this; }
     // #endregin
 
     // #region GIZMO INTERFACE

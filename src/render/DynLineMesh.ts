@@ -1,6 +1,7 @@
 // @ts-nocheck
 
-import * as THREE from 'three';
+import * as THREE   from 'three';
+import Util3JS      from './Util3JS';
 
 class DynLineMesh extends THREE.LineSegments{
     _defaultColor   = 0x00ff00;
@@ -36,7 +37,7 @@ class DynLineMesh extends THREE.LineSegments{
 
     add( p0, p1, color0=this._defaultColor, color1=null, isDash=false ): this{
         this._verts.push( p0[0], p0[1], p0[2], p1[0], p1[1], p1[2] );
-        this._color.push( ...glColor( color0 ), ...glColor( (color1 != null) ? color1:color0 ) );
+        this._color.push( ...Util3JS.glColor( color0 ), ...Util3JS.glColor( (color1 != null) ? color1:color0 ) );
 
         if( isDash ){
             const len = Math.sqrt(
@@ -116,15 +117,6 @@ function _newDynLineMeshGeometry( aVerts, aColor, aConfig, doCompute=true ){
         geo.computeBoundingBox();
     }
     return geo;
-}
-
-function glColor( hex: number, out: Array<number> = [0,0,0] ): Array<number>{
-    const NORMALIZE_RGB = 1 / 255;
-    out[0] = ( hex >> 16 & 255 ) * NORMALIZE_RGB;
-    out[1] = ( hex >> 8 & 255 )  * NORMALIZE_RGB;
-    out[2] = ( hex & 255 )       * NORMALIZE_RGB;
-
-    return out;
 }
 //#endregion
 

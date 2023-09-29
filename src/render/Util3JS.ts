@@ -14,5 +14,14 @@ export default class Util3JS{
         return geo;
     }
 
+    static glColor( hex: number, out: Array<number> = [0,0,0] ): Array<number>{
+        const NORMALIZE_RGB = 1 / 255;
+        out[0] = ( hex >> 16 & 255 ) * NORMALIZE_RGB;
+        out[1] = ( hex >> 8 & 255 )  * NORMALIZE_RGB;
+        out[2] = ( hex & 255 )       * NORMALIZE_RGB;
+    
+        return out;
+    }
+
 }
 

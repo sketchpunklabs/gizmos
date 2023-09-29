@@ -1,7 +1,6 @@
 // @ts-nocheck
-
-import type { vec3 }        from 'gl-matrix';
-import * as THREE           from 'three';
+import * as THREE   from 'three';
+import Util3JS      from './Util3JS';
 
 export default class ShapePointsMesh extends THREE.Points{
     _defaultShape   = 1;
@@ -39,7 +38,7 @@ export default class ShapePointsMesh extends THREE.Points{
 
     add( pos: ConstVec3, color = this._defaultColor, size = this._defaultSize, shape = this._defaultShape ): this{
         this._verts.push( pos[0], pos[1], pos[2] );
-        this._color.push( ...glColor( color ) );
+        this._color.push( ...Util3JS.glColor( color ) );
         this._config.push( size, shape );
         this._cnt++;
         this._dirty = true;
@@ -57,7 +56,7 @@ export default class ShapePointsMesh extends THREE.Points{
         return this;
     }
 
-    setPosAt( idx: number, pos: vec3 ): this{
+    setPosAt( idx: number, pos: Array<number> ): this{
         idx    *= 3;
         this._verts[ idx     ] = pos[ 0 ];
         this._verts[ idx + 1 ] = pos[ 1 ];
@@ -66,7 +65,7 @@ export default class ShapePointsMesh extends THREE.Points{
         return this;
     }
 
-    getPosAt( idx: number ): vec3{
+    getPosAt( idx: number ): Array<number>{
         idx    *= 3;
         return [
             this._verts[ idx + 0 ],
@@ -137,15 +136,6 @@ function _newShapePointsMeshGeometry( aVerts, aColor, aConfig, doCompute=true ){
         geo.computeBoundingBox();
     }
     return geo;
-}
-
-function glColor( hex: number, out: vec3 = [0,0,0] ): vec3{
-    const NORMALIZE_RGB = 1 / 255;
-    out[0] = ( hex >> 16 & 255 ) * NORMALIZE_RGB;
-    out[1] = ( hex >> 8 & 255 )  * NORMALIZE_RGB;
-    out[2] = ( hex & 255 )       * NORMALIZE_RGB;
-
-    return out;
 }
 //#endregion
 

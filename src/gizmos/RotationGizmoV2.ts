@@ -4,17 +4,21 @@ import type Ray             from '../ray/Ray';
 import type { Object3D }    from 'three';
 import type { PlaneMovement, IPlaneMovementHandler } from '../actions/PlaneMovement';
 
-import { Group }        from 'three';
+import { Group, Mesh, MeshBasicMaterial, DoubleSide } from 'three';
 import intersectPlane   from '../ray/intersectPlane';
 import StateProxy       from '../util/StateProxy';
-import DynLineMesh      from '../render/DynLineMesh';
+import arrowArcShape    from '../geo/ArrowArc';
+import Util3JS          from '../render/Util3JS';
 import Vec3             from '../maths/Vec3';
 import Quat             from '../maths/Quat';
 // #endregion
 
-export default class RotationGizmoX extends Group implements IGizmo, IPlaneMovementHandler { 
+const X_COLOR = 0xF75D6C;
+const Y_COLOR = 0x47ED6D;
+const Z_COLOR = 0x0196FF;
+
+export default class RotationGizmo extends Group implements IGizmo, IPlaneMovementHandler { 
     // #region MAIN
-    _ln       = new DynLineMesh();   // Render Gizmo
     _hitPos   = new Vec3();          // Last hit position
     _xAxis    = new Vec3( [1,0,0] ); // Axes to move on
     _yAxis    = new Vec3( [0,1,0] );
@@ -24,7 +28,7 @@ export default class RotationGizmoX extends Group implements IGizmo, IPlaneMovem
     _camScale = 1;      // Scale gizmo by cam distances
     _selAxis  = -1;
     _isDirty  = false;
-    _range    = 0.2;   // Hit Range
+    _range    = 0.3;   // Hit Range
     _radius   = 1;
 
     state     = StateProxy.new({
@@ -40,7 +44,7 @@ export default class RotationGizmoX extends Group implements IGizmo, IPlaneMovem
         const proxy = this.state.$;
         proxy.on( 'change', this.onStateChange );
 
-        this.add( ( this._ln as unknown as Object3D ) );
+        buildMeshes( this );
         this._render();
     }
 
@@ -189,6 +193,19 @@ export default class RotationGizmoX extends Group implements IGizmo, IPlaneMovem
         }
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Test 90 Degree Arc
+        if( sel !== -1 ){
+            const dir = new Vec3().fromSub( this._hitPos, pos ).norm();
+
+            // Exclude if its outside the 90 Degree Arc
+            if( Vec3.dot( dir, this._axes[ ( sel + 1 ) % 3 ] ) < 0 ||
+                Vec3.dot( dir, this._axes[ ( sel + 2 ) % 3 ] ) < 0 ){
+                sel = -1;
+                min = Infinity;
+            }
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if( this._selAxis !== sel ) this._isDirty = true;
 
         this._selAxis = sel;
@@ -197,33 +214,39 @@ export default class RotationGizmoX extends Group implements IGizmo, IPlaneMovem
 
     _render(){
         const sel: number   = this._selAxis;
-        const cx : number   = ( sel === 0 )? 0xffffff : 0xff0000;
-        const cy : number   = ( sel === 1 )? 0xffffff : 0x00ff00;
-        const cz : number   = ( sel === 2 )? 0xffffff : 0x0000ff;
+        const cx : number   = ( sel === 0 )? 0xffffff : X_COLOR;
+        const cy : number   = ( sel === 1 )? 0xffffff : Y_COLOR;
+        const cz : number   = ( sel === 2 )? 0xffffff : Z_COLOR;
 
-        const steps = 24;
-        let c       = Math.cos( 0 * Math.PI * 2 );
-        let s       = Math.sin( 0 * Math.PI * 2 );
-        const z     = new Vec3( c,s,0 );
-        const y     = new Vec3( c,0,s );
-        const x     = new Vec3( 0,c,s );
-        let t: number;
-
-        this._ln.reset();
-
-        for( let i=0; i <= steps; i++ ){
-            t = i / steps;
-            c = Math.cos( t * Math.PI * 2 );
-            s = Math.sin( t * Math.PI * 2 );
-
-            this._ln.add( x, [0,c,s], cx );
-            this._ln.add( y, [c,0,s], cy );
-            this._ln.add( z, [c,s,0], cz );
-            
-            x.xyz( 0, c, s );
-            y.xyz( c, 0, s );
-            z.xyz( c, s, 0 );
-        }
+        // @ts-expect-error: 2339 Material does exist
+        this.children[0].material.color.setHex( cx );
+        // @ts-expect-error: 2339
+        this.children[1].material.color.setHex( cy );
+        // @ts-expect-error: 2339
+        this.children[2].material.color.setHex( cz );
     }
     // #endregion
+}
+
+function buildMeshes( root: Object3D ): Array<Mesh>{
+    const shape  = arrowArcShape();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const geo = Util3JS.geoBuffer( { vertices: new Float32Array( shape.vertices ), indices: new Uint16Array( shape.indices ) } );
+    geo.computeVertexNormals();
+
+    const xMesh = new Mesh( geo, new MeshBasicMaterial( { side: DoubleSide, color: X_COLOR } ) );
+    xMesh.rotation.y = Math.PI * -0.5;
+    root.add( xMesh );
+
+    const yMesh = new Mesh( geo, new MeshBasicMaterial( { side: DoubleSide, color: Y_COLOR } ) );
+    yMesh.rotation.x = Math.PI * 0.5;
+    root.add( yMesh );
+
+    const zMesh = new Mesh( geo, new MeshBasicMaterial( { side: DoubleSide, color: Z_COLOR } ) );
+    zMesh.rotation.x = Math.PI;
+    zMesh.rotation.z = Math.PI * -0.5;
+    root.add( zMesh );
+
+    return [ xMesh, yMesh, zMesh ];
 }

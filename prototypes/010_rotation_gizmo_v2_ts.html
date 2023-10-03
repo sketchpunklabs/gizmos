@@ -5,7 +5,8 @@
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from './_lib/useThreeWebGL2.js';
 import facedCube from './_lib/meshes/facedCube.js';
 
-import { Gizmos, RotationGizmo } from '../src/index.ts';
+import { Gizmos }       from '../src/index.ts';
+import RotationGizmo    from '../src/gizmos/RotationGizmoV2.ts';
 //#endregion
 
 //#region MAIN
@@ -20,7 +21,10 @@ window.addEventListener( 'load', async _=>{
     Debug = await useVisualDebug( App );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    let cube = facedCube();
+    const cube = new THREE.Mesh(
+        new THREE.BoxGeometry( 1, 1, 1 ),
+        new THREE.MeshPhongMaterial( { color: 0xe0e0e0 } )
+    );
     cube.scale.setScalar( 1.0 );
     cube.position.fromArray( [0.0,0.5,0] )
     App.scene.add( cube );

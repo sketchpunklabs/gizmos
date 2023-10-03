@@ -23,7 +23,12 @@ window.addEventListener( 'load', async _=>{
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    tearShape();
+    // tearShape();
+
+    // arrowArcLoop();
+
+    
+    triArrowArc(); // arrowArc2();
 
 
     /*
@@ -147,6 +152,253 @@ function tearShape( radius=1, steps=24, power=8, pull=0.4 ){
 
     const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( {side : THREE.DoubleSide,}) );
     App.scene.add( mesh );
+}
+
+
+// #region ARROW ARC LOOP
+function arrowArcLoop(){
+    const shape = arrowArc();
+
+    let vertices = shape.vertices.slice();
+    let indices  = shape.indices.slice();
+
+    let iOff = vertices.length / 3;
+    let i, x, y, z;
+    for( i=0; i < shape.vertices.length; i+=3 ){
+        x = shape.vertices[ i+0 ];
+        y = shape.vertices[ i+1 ];
+        z = shape.vertices[ i+2 ];
+        vertices.push( y, -x, z );
+    }
+
+    // // o[0] = y; o[1] = -x; o[2] = z;
+
+    // y-xz rot z+90
+
+    // -x,-y,z rot z+180
+
+    for( i=0; i < shape.indices.length; i++ ){
+        indices.push( shape.indices[i] + iOff );
+    }
+
+    iOff = vertices.length / 3
+    for( i=0; i < shape.vertices.length; i+=3 ){
+        x = shape.vertices[ i+0 ];
+        y = shape.vertices[ i+1 ];
+        z = shape.vertices[ i+2 ];
+        vertices.push( -x, -y, z );
+    }
+
+    
+    for( i=0; i < shape.indices.length; i++ ){
+        indices.push( shape.indices[i] + iOff );
+    }
+
+
+    iOff = vertices.length / 3
+    for( i=0; i < shape.vertices.length; i+=3 ){
+        x = shape.vertices[ i+0 ];
+        y = shape.vertices[ i+1 ];
+        z = shape.vertices[ i+2 ];
+        vertices.push( -y, x, z );
+    }
+
+    
+    for( i=0; i < shape.indices.length; i++ ){
+        indices.push( shape.indices[i] + iOff );
+    }
+
+    const geo = geoBuffer( { vertices: new Float32Array( vertices ), indices: new Uint16Array( indices ) } );
+    geo.computeVertexNormals();
+
+    const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0x0196FF } ) );
+    mesh.position.y = 1.0;
+    App.scene.add( mesh );
+
+    let m = mesh.clone();
+    m.rotation.y = Math.PI * 0.5;
+    m.material  = new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0xF75D6C } ) // x
+    // m.scale.set( 1.2, 1.2, 1 );
+    App.scene.add( m );
+
+    let mm = mesh.clone();
+    mm.rotation.x = Math.PI * 0.5;
+    mm.material  = new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0x47ED6D } ) // y
+    App.scene.add( mm );
+
+}
+
+function arrowArc(){
+    // let steps = 5;
+    // let inc = Math.PI * 0.5 / steps;
+    let w      = 0.2;
+    let wh     = w * 0.5;
+    
+    let ang    = lawcosSSS( 1, 1, wh );
+    let steps  = 6;
+    let inc    = ( Math.PI * 0.5 - ang * 2 ) / steps;
+
+    let verts  = [];
+
+    for( let i=0; i <= steps; i++ ){
+        let rad = ang + inc * i;
+        let c = Math.cos( rad );
+        let s = Math.sin( rad );
+
+        // Debug.pnt.add( [c, s, 0 ], 0x00ff00, 1 );
+        // Debug.pnt.add( [c, s, wh ], 0x00fffff, 1 );
+        // Debug.pnt.add( [c, s, -wh ], 0x00fffff, 1 );
+
+        verts.push( c, s, wh, c, s, -wh );
+    }
+
+    verts.push( 1, 0, 0,  0, 1, 0 );
+
+    // Debug.pnt.add( [1,0,0], 0x00ffff, 1 );
+    // Debug.pnt.add( [0,1,0], 0x00ffff, 1 );
+
+    let indices = [];
+    for( let i=0; i <= steps; i++ ){
+        const a  = i * 2;
+        const b  = a + 1;
+        const d  = a + 2;
+        const c  = a + 3;
+        // const b  = ((i + 1) % steps) + steps;
+
+        if( i === steps )    indices.push( a, b, verts.length/3-1 );
+        else                 indices.push( a, b, c, c, d, a );
+
+        console.log( a, b, c, d );
+    }
+
+    indices.push( 1, 0, verts.length/3-2 );
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // const geo = geoBuffer( { vertices: new Float32Array( verts ), indices: new Uint16Array( indices ) } );
+    // geo.computeVertexNormals();
+
+    // const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( {side : THREE.DoubleSide } ) );
+    // App.scene.add( mesh );
+
+    return { vertices:verts, indices };
+}
+
+function lawcosSSS( aLen, bLen, cLen ){
+    // Law of Cosines - SSS : cos(C) = (a^2 + b^2 - c^2) / 2ab
+    // The Angle between A and B with C being the opposite length of the angle.
+    let v = ( aLen*aLen + bLen*bLen - cLen*cLen ) / ( 2 * aLen * bLen );
+    if( v < -1 )		v = -1;	// Clamp to prevent NaN Errors
+    else if( v > 1 )	v = 1;
+    return Math.acos( v );
+}
+// #endregion
+
+
+
+function arrowArc2(){
+    let tail  = 0.1;
+    let ringW = 0.2;
+    let arrowW = 0.4;
+    let arrowH = 0.4;
+    let steps  = 8;
+
+    let rw = ringW * 0.5;
+    let aw = arrowW * 0.5;
+    let ah = arrowH * 0.5;
+
+    let startRad = lawcosSSS( 1, 1, ah );
+    let inc      = ( Math.PI * 0.5 - startRad * 2 ) / steps
+    let verts  = [];
+
+    let rad, c, s;
+
+    for( let i=0; i <= steps; i++ ){
+        rad = startRad + inc * i;
+        c = Math.cos( rad );
+        s = Math.sin( rad );
+
+        // Debug.pnt.add( [c, s, 0 ], 0x00ff00, 1 );
+        // Debug.pnt.add( [c, s, rw ], 0x00fffff, 1 );
+        // Debug.pnt.add( [c, s, -rw ], 0x00fffff, 1 );
+
+        verts.push( c, s, rw, c, s, -rw );
+    }
+
+    let ai = verts.length / 3; // Starting Index for Arrow Points
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Arrow Head
+    c = Math.cos( startRad );
+    s = Math.sin( startRad );
+
+    // Debug.pnt.add( [c, s, 0 ], 0xffff00, 2 );
+    // Debug.pnt.add( [c, s, aw ], 0xffff00, 2 );
+    // Debug.pnt.add( [c, s, -aw ], 0xffff00, 2 );
+    // Debug.pnt.add( [c, -ah, 0 ], 0xffff00, 2 );
+
+    verts.push( 
+        c,   s,  aw,    // Arrow Left Pnt
+        c,   s, -aw,    // Arrow Right Pnt
+        c, -ah,   0,    // Arrow Point Pnt
+    );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Tail
+    c = Math.cos( Math.PI * 0.5 - startRad );
+    s = Math.sin( Math.PI * 0.5 - startRad );
+    verts.push( c-0.1, s, rw );
+    // Debug.pnt.add( [c-tail, s, rw ], 0xff0000, 2 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Debug.pnt.add( [1,0,0], 0x00ffff, 1 );
+    // Debug.pnt.add( [0,1,0], 0x00ffff, 1 );
+
+    let indices = [];
+    for( let i=0; i < steps; i++ ){
+        const a  = i * 2;
+        const b  = a + 1;
+        const d  = a + 2;
+        const c  = a + 3;        
+        indices.push( a, b, c, c, d, a );
+        console.log( a, b, c, d );
+    }
+
+    indices.push( 0, ai, ai+2 );    // Left Arrow
+    indices.push( ai+1, 1, ai+2 );  // Right Arrow
+    indices.push( 1, 0, ai+2 );     // Center Arrow
+    indices.push( ai-1, ai-2, ai+3 );  // Tail
+
+
+    return { vertices:verts, indices };
+}
+
+function triArrowArc(){
+    const shape  = arrowArc2();
+    let vertices = shape.vertices.slice();
+    let indices  = shape.indices.slice();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const geo = geoBuffer( { vertices: new Float32Array( vertices ), indices: new Uint16Array( indices ) } );
+    geo.computeVertexNormals();
+
+    const mesh = new THREE.Mesh( geo, new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0xF75D6C } ) ); // x //
+    mesh.rotation.y = Math.PI * -0.5;
+    mesh.position.y = 0.3;
+    App.scene.add( mesh );
+
+    const m = mesh.clone();
+    m.rotation.y = Math.PI * 0;
+    m.rotation.x = Math.PI * 0.5;
+    m.material  = new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0x47ED6D } ) // y
+    App.scene.add( m );
+
+    const mm = mesh.clone();
+    mm.rotation.y = Math.PI * 0;
+    mm.rotation.x = Math.PI;
+    mm.rotation.z = Math.PI * -0.5;
+    mm.material  = new THREE.MeshBasicMaterial( { side : THREE.DoubleSide, color:0x0196FF } ) // z
+    App.scene.add( mm );
 }
 
 </script></body></html>
